@@ -2,6 +2,7 @@
 import { PDFDocument, Tag, ExtractionResult, TextElement } from '../types';
 import { extractTextFromRegion, extractTextElementsFromPage } from './textExtraction';
 import { createPdfLoadingTask } from './core';
+import extractionLogger from './extractionLogger';
 
 export const extractTextFromAllDocuments = async (
   documents: PDFDocument[],
@@ -9,11 +10,24 @@ export const extractTextFromAllDocuments = async (
 ): Promise<ExtractionResult[]> => {
   const results: ExtractionResult[] = [];
   
+  // Start the extraction process logging
+  extractionLogger.startExtraction();
+  extractionLogger.logStep('Beginning batch extraction', { 
+    documentCount: documents.length,
+    tagCount: tags.length 
+  });
+  
   for (const document of documents) {
     if (!document.data) {
       console.error(`Document ${document.name} has no data`);
+      extractionLogger.logStep('Document skipped - no data', { documentName: document.name });
       continue;
     }
+    
+    extractionLogger.logStep('Processing document', { 
+      documentName: document.name,
+      documentId: document.id 
+    });
     
     // Only process the first page of each document
     const pageNum = 1;
@@ -25,14 +39,37 @@ export const extractTextFromAllDocuments = async (
       // Create a copy of the ArrayBuffer to prevent it from being detached
       const dataClone = new Uint8Array(document.data).buffer;
       
+      extractionLogger.logStep('Extracting text elements from page', { 
+        documentName: document.name,
+        pageNumber: pageNum 
+      });
+      
       // Extract all text elements from the page once - this is more efficient
       const allTextElements = await extractTextElementsFromPage(dataClone, pageNum);
       
+      extractionLogger.logStep('Text elements extracted', { 
+        documentName: document.name,
+        elementCount: allTextElements.length 
+      });
+      
       if (allTextElements.length === 0) {
         // No text elements found in the document
+        extractionLogger.logStep('No text elements found in document', { 
+          documentName: document.name,
+          reason: 'May be scanned/image-based PDF' 
+        });
+        
         for (const tag of tags) {
+          const resultId = `${document.id}-${pageNum}-${tag.id}`;
+          
+          extractionLogger.logStep('Creating empty result for tag', { 
+            tagName: tag.name,
+            resultId: resultId,
+            errorCode: 'NO_TEXT_CONTENT'
+          });
+          
           results.push({
-            id: `${document.id}-${pageNum}-${tag.id}`,
+            id: resultId,
             documentId: document.id,
             fileName: document.name,
             pageNumber: pageNum,
@@ -46,6 +83,11 @@ export const extractTextFromAllDocuments = async (
       }
       
       for (const tag of tags) {
+        extractionLogger.logStep('Processing tag', { 
+          tagName: tag.name,
+          tagRegion: tag.region 
+        });
+        
         // Filter text elements within the tag region
         const textElementsInRegion = allTextElements.filter(element => 
           element.position.x >= tag.region.x &&
@@ -54,10 +96,28 @@ export const extractTextFromAllDocuments = async (
           element.position.y <= (tag.region.y + tag.region.height)
         );
         
+        extractionLogger.logStep('Filtered text elements in region', { 
+          tagName: tag.name,
+          elementCount: textElementsInRegion.length,
+          elements: textElementsInRegion.map(el => ({ 
+            text: el.text,
+            position: el.position
+          }))
+        });
+        
+        // Store extracted elements for debugging
+        const resultId = `${document.id}-${pageNum}-${tag.id}`;
+        extractionLogger.storeExtractedElements(resultId, textElementsInRegion);
+        
         if (textElementsInRegion.length === 0) {
           // No text found in this specific tag region
+          extractionLogger.logStep('No text elements found in tag region', { 
+            tagName: tag.name,
+            errorCode: 'EMPTY_REGION'
+          });
+          
           documentResults.push({
-            id: `${document.id}-${pageNum}-${tag.id}`,
+            id: resultId,
             documentId: document.id,
             fileName: document.name,
             pageNumber: pageNum,
@@ -82,6 +142,11 @@ export const extractTextFromAllDocuments = async (
           }
           // Different lines, sort by Y
           return a.position.y - b.position.y;
+        });
+        
+        extractionLogger.logStep('Sorted text elements by position', { 
+          tagName: tag.name,
+          sortedCount: sortedElements.length
         });
         
         // Combine text with proper formatting
@@ -119,8 +184,14 @@ export const extractTextFromAllDocuments = async (
           .replace(/(\n\s*){3,}/g, '\n\n') // Replace multiple consecutive line breaks with just two
           .trim();
         
+        extractionLogger.logStep('Text assembled and cleaned', { 
+          tagName: tag.name,
+          textLength: extractedText.length,
+          textPreview: extractedText.substring(0, 100) + (extractedText.length > 100 ? '...' : '')
+        });
+        
         documentResults.push({
-          id: `${document.id}-${pageNum}-${tag.id}`,
+          id: resultId,
           documentId: document.id,
           fileName: document.name,
           pageNumber: pageNum,
@@ -134,6 +205,13 @@ export const extractTextFromAllDocuments = async (
       results.push(...documentResults);
     } catch (error) {
       console.error(`Error processing document ${document.name}:`, error);
+      
+      extractionLogger.logStep('Error processing document', { 
+        documentName: document.name,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorStack: error instanceof Error ? error.stack : undefined
+      });
+      
       // Add error result for this document
       for (const tag of tags) {
         results.push({
@@ -149,6 +227,9 @@ export const extractTextFromAllDocuments = async (
       }
     }
   }
+  
+  extractionLogger.logStep('Extraction complete', { resultCount: results.length });
+  extractionLogger.finishExtraction();
   
   return results;
 };

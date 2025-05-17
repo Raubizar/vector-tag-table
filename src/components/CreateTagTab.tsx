@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import PDFViewer from '@/components/PDFViewer';
@@ -6,6 +5,7 @@ import TagManager from '@/components/TagManager';
 import DocumentSelector from '@/components/DocumentSelector';
 import ActionsPanel from '@/components/ActionsPanel';
 import { PDFDocument, Tag } from '@/lib/types';
+import extractionLogger from '@/lib/pdf/extractionLogger';
 
 interface CreateTagTabProps {
   documents: PDFDocument[];
@@ -42,6 +42,41 @@ const CreateTagTab: React.FC<CreateTagTabProps> = ({
   onClearAll,
   onTagUpdated
 }) => {
+  const handleExtractText = async () => {
+    if (documents.length === 0 || tags.length === 0) {
+      toast.error('You need at least one document and one tag to extract text');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Enable logging for this extraction
+      extractionLogger.enable();
+      extractionLogger.reset();
+      
+      const extractionResults = await extractTextFromAllDocuments(documents, tags);
+      setResults(extractionResults);
+      saveResults(extractionResults);
+      
+      toast.success(`Extracted ${extractionResults.length} results from the first page of each document`);
+      onViewResults();
+      
+    } catch (error) {
+      console.error('Error extracting text:', error);
+      toast.error('Failed to extract text from documents');
+      
+      // Log the error
+      extractionLogger.logStep('Extraction failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <div>
@@ -98,7 +133,7 @@ const CreateTagTab: React.FC<CreateTagTabProps> = ({
         </Card>
         
         <ActionsPanel
-          onExtractText={onExtractText}
+          onExtractText={handleExtractText}
           onViewResults={onViewResults}
           onClearAll={onClearAll}
           isProcessing={isProcessing}
