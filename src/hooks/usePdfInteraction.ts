@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Tag } from '@/lib/types';
 import usePdfTagSelection from './usePdfTagSelection';
@@ -20,7 +21,7 @@ export default function usePdfInteraction({
   onTagUpdated,
   onZoomToRegion
 }: UsePdfInteractionProps) {
-  // Updated to explicitly include 'zoom' in the type
+  // Update the type to include 'zoom' as a valid mode
   const [mode, setMode] = useState<'select' | 'move' | 'resize' | 'zoom'>('select');
   
   const {
