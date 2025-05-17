@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { PDFDocument, Tag } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import PDFCanvas from './pdf/PDFCanvas';
@@ -59,10 +59,24 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       // Set scroll position
       scrollContainerRef.current.scrollLeft = Math.max(0, targetX);
       scrollContainerRef.current.scrollTop = Math.max(0, targetY);
-      
-      toast.success("Zoomed to selection");
     }, 100);
   }, []);
+  
+  // Listen for auto-zoom events
+  useEffect(() => {
+    const handleAutoZoom = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        handleZoomToRegion(customEvent.detail);
+      }
+    };
+    
+    document.addEventListener('auto-zoom-to-region', handleAutoZoom);
+    
+    return () => {
+      document.removeEventListener('auto-zoom-to-region', handleAutoZoom);
+    };
+  }, [handleZoomToRegion]);
   
   const {
     isSelecting,
@@ -155,6 +169,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
               currentPage={currentPage}
               scale={scale}
               onDimensionsChange={setPdfDimensions}
+              autoZoom={true}
             />
             
             {/* Selection box overlay */}

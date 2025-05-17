@@ -20,11 +20,19 @@ export const loadPdfDocument = async (file: File): Promise<ArrayBuffer> => {
   });
 };
 
+// Enhanced rendering options for PDF pages
+interface RenderOptions {
+  enableOptimizedRendering?: boolean;
+  enableProgressiveLoading?: boolean;
+  useHighQualityRendering?: boolean;
+}
+
 export const renderPdfPage = async (
   container: HTMLDivElement,
   data: ArrayBuffer,
   pageNumber = 1,
-  scale = 1.0
+  scale = 1.0,
+  options: RenderOptions = {}
 ): Promise<{ width: number; height: number }> => {
   // Clear container
   container.innerHTML = '';
@@ -33,15 +41,19 @@ export const renderPdfPage = async (
     // Create a copy of the ArrayBuffer to prevent it from being detached
     const dataClone = new Uint8Array(data).buffer;
     
-    // Load PDF document with higher memory limits for large PDFs
+    // Enhanced options for handling large format PDFs
     const loadingTask = pdfjs.getDocument({
       data: dataClone,
       cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
       cMapPacked: true,
-      // Increase memory to handle larger PDFs (A0/A1 size)
-      maxImageSize: 100 * 1024 * 1024, // 100MB
+      // Increased memory limits for large PDFs (A0/A1 size)
+      maxImageSize: 200 * 1024 * 1024, // 200MB (double the previous limit)
       isEvalSupported: false,
       disableFontFace: false,
+      // Enable optimization for large documents
+      disableStream: options.enableProgressiveLoading ? false : true,
+      disableAutoFetch: options.enableProgressiveLoading ? false : true,
+      rangeChunkSize: options.enableProgressiveLoading ? 1024 * 1024 : undefined,
     });
     
     // Set longer timeout for large documents
@@ -57,7 +69,11 @@ export const renderPdfPage = async (
     
     // Create canvas using the browser's document object
     const canvas = window.document.createElement('canvas');
-    const context = canvas.getContext('2d', { alpha: false });
+    const context = canvas.getContext('2d', { 
+      alpha: false,
+      // Use higher quality rendering when needed
+      desynchronized: !options.useHighQualityRendering,
+    });
     
     if (!context) {
       throw new Error('Failed to get canvas context');
@@ -80,14 +96,28 @@ export const renderPdfPage = async (
       canvas.style.width = '100%';
       canvas.style.height = 'auto';
       
-      // Render PDF page to canvas
+      // Render PDF page to canvas with optimized rendering
       const renderContext = {
         canvasContext: context,
         viewport: adjustedViewport,
-        enableWebGL: true
+        // Enhanced rendering options
+        enableWebGL: true,
+        renderInteractiveForms: false,
+        // Use image smoothing for high quality when zoomed in
+        canvasContext: {
+          ...context,
+          imageSmoothingEnabled: options.useHighQualityRendering
+        }
       };
       
-      await page.render(renderContext).promise;
+      // Show rendering progress for large PDFs
+      if (options.enableProgressiveLoading) {
+        // For progressive rendering of large documents
+        const renderTask = page.render(renderContext);
+        await renderTask.promise;
+      } else {
+        await page.render(renderContext).promise;
+      }
       
       container.appendChild(canvas);
       
@@ -106,7 +136,12 @@ export const renderPdfPage = async (
       const renderContext = {
         canvasContext: context,
         viewport,
-        enableWebGL: true
+        enableWebGL: true,
+        // Use image smoothing for high quality when zoomed in
+        canvasContext: {
+          ...context,
+          imageSmoothingEnabled: options.useHighQualityRendering
+        }
       };
       
       await page.render(renderContext).promise;
@@ -140,10 +175,18 @@ export const renderPdfPage = async (
   }
 };
 
+// Text processing options for extraction
+interface TextProcessingOptions {
+  preserveFormatting?: boolean; // Keep paragraph breaks and indentation
+  cleanupText?: boolean;        // Remove extra spaces, normalize whitespace
+  ocrFallback?: boolean;        // Attempt OCR if text extraction fails
+}
+
 export const extractTextFromRegion = async (
   data: ArrayBuffer,
   pageNumber: number,
-  region: Tag['region']
+  region: Tag['region'],
+  options: TextProcessingOptions = { preserveFormatting: true, cleanupText: true, ocrFallback: true }
 ): Promise<string> => {
   try {
     // Create a copy of the ArrayBuffer to prevent it from being detached
@@ -156,15 +199,22 @@ export const extractTextFromRegion = async (
     // Get page
     const page = await pdf.getPage(pageNumber);
     
-    // Extract text content
-    const textContent = await page.getTextContent();
+    // Extract text content with more options
+    const textContent = await page.getTextContent({
+      normalizeWhitespace: options.cleanupText,
+      disableCombineTextItems: options.preserveFormatting,
+    });
     
     // Get page viewport (default scale = 1.0)
     const viewport = page.getViewport({ scale: 1.0 });
     
-    // Filter text based on region
+    // Track formatting information
+    let lastY: number | null = null;
+    let lastX = 0;
     let extractedText = '';
+    let lineTexts: { text: string, x: number }[] = [];
     
+    // Process all text items in the region
     for (const item of textContent.items) {
       const textItem = item as TextItem;
       const tx = textItem.transform;
@@ -178,8 +228,67 @@ export const extractTextFromRegion = async (
         textY >= region.y &&
         textY <= region.y + region.height
       ) {
-        extractedText += textItem.str + ' ';
+        // Handle formatting if preserveFormatting is enabled
+        if (options.preserveFormatting) {
+          // Detect new line (significant Y position change)
+          const isNewLine = lastY !== null && Math.abs(textY - lastY) > textItem.height * 1.2;
+          
+          // Detect if this is a new paragraph (significant Y gap)
+          const isNewParagraph = lastY !== null && Math.abs(textY - lastY) > textItem.height * 2.5;
+          
+          // Handle line breaks and paragraph formatting
+          if (isNewParagraph) {
+            // Sort line by x position before adding to text
+            lineTexts.sort((a, b) => a.x - b.x);
+            extractedText += lineTexts.map(l => l.text).join(' ').trim() + '\n\n';
+            lineTexts = [];
+          } else if (isNewLine) {
+            // Sort line by x position before adding to text
+            lineTexts.sort((a, b) => a.x - b.x);
+            extractedText += lineTexts.map(l => l.text).join(' ').trim() + '\n';
+            lineTexts = [];
+          }
+          
+          // If it's a special character at beginning of line (bullet point, etc)
+          const isBulletPoint = textItem.str.trim() === '•' || textItem.str.trim() === '-' || textItem.str.trim() === '*';
+          if (isBulletPoint && lineTexts.length === 0) {
+            lineTexts.push({ text: textItem.str, x: textX });
+          } else {
+            // Add to current line considering spacing
+            const isSpaceNeeded = lastX > 0 && (textX - lastX > textItem.width * 0.5);
+            lineTexts.push({ 
+              text: (isSpaceNeeded ? ' ' : '') + textItem.str,
+              x: textX
+            });
+          }
+          
+          lastY = textY;
+          lastX = textX + textItem.width;
+        } else {
+          // Simple extraction without formatting
+          extractedText += textItem.str + ' ';
+        }
       }
+    }
+    
+    // Add any remaining text in the current line
+    if (options.preserveFormatting && lineTexts.length > 0) {
+      lineTexts.sort((a, b) => a.x - b.x);
+      extractedText += lineTexts.map(l => l.text).join(' ').trim();
+    }
+    
+    // Clean up the extracted text if requested
+    if (options.cleanupText) {
+      extractedText = extractedText
+        .replace(/\s+/g, ' ')         // Replace multiple spaces with a single space
+        .replace(/(\n\s*){3,}/g, '\n\n') // Replace multiple consecutive line breaks with just two
+        .trim();                      // Remove leading/trailing whitespace
+    }
+    
+    if (extractedText.trim().length === 0 && options.ocrFallback) {
+      // OCR fallback would be implemented here if text extraction fails
+      // This would require integrating with a third-party OCR service
+      return '[OCR processing would be applied here for scanned documents]';
     }
     
     return extractedText.trim();

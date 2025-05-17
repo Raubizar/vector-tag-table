@@ -9,13 +9,15 @@ interface PDFCanvasProps {
   currentPage: number;
   scale: number;
   onDimensionsChange: (dimensions: { width: number; height: number }) => void;
+  autoZoom?: boolean;
 }
 
 const PDFCanvas: React.FC<PDFCanvasProps> = ({
   document,
   currentPage,
   scale,
-  onDimensionsChange
+  onDimensionsChange,
+  autoZoom = true
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -56,14 +58,56 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           console.log("Rendering large PDF at high zoom level:", scale);
         }
         
+        // Render the PDF with optimized parameters for large format documents
         const dimensions = await renderPdfPage(
           containerRef.current,
           dataClone,
           currentPage,
-          scale
+          scale,
+          {
+            enableOptimizedRendering: true,
+            enableProgressiveLoading: true,
+            useHighQualityRendering: scale > 1.5
+          }
         );
         
         onDimensionsChange(dimensions);
+        
+        // If autoZoom is enabled and this is the first render (scale == 1),
+        // automatically zoom to the bottom right A4 area
+        if (autoZoom && scale === 1 && dimensions.width > 1000) {
+          // Wait a bit for the canvas to fully render
+          setTimeout(() => {
+            const a4WidthMm = 210; // A4 width in mm
+            const a4HeightMm = 297; // A4 height in mm
+            
+            // Get the current PDF dimensions in pixels
+            const pdfWidthPx = dimensions.width;
+            const pdfHeightPx = dimensions.height;
+            
+            // Calculate A4 size in the current PDF's pixel scale
+            const pxPerMm = Math.min(pdfWidthPx / 841, pdfHeightPx / 1189); // A0 size is 841×1189 mm
+            const a4WidthPx = a4WidthMm * pxPerMm;
+            const a4HeightPx = a4HeightMm * pxPerMm;
+            
+            // Calculate the bottom right A4 area (with some padding)
+            const padding = 20; // pixels
+            const targetRegion = {
+              x: Math.max(0, pdfWidthPx - a4WidthPx - padding),
+              y: Math.max(0, pdfHeightPx - a4HeightPx - padding),
+              width: Math.min(a4WidthPx, pdfWidthPx),
+              height: Math.min(a4HeightPx, pdfHeightPx)
+            };
+            
+            // Dispatch a custom event to trigger zooming to this region
+            const zoomEvent = new CustomEvent('auto-zoom-to-region', { 
+              detail: targetRegion
+            });
+            document.dispatchEvent(zoomEvent);
+            
+            toast.info("Auto-zoomed to A4 size area");
+          }, 500);
+        }
       } catch (error) {
         console.error('Error rendering PDF:', error);
         toast.error('Failed to render PDF');
@@ -87,7 +131,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
         }
       }
     };
-  }, [document, currentPage, scale, onDimensionsChange]);
+  }, [document, currentPage, scale, onDimensionsChange, autoZoom]);
 
   return (
     <div
