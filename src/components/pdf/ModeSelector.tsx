@@ -1,18 +1,18 @@
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import { PointerIcon, MoveIcon, ZoomInIcon } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { InteractionMode } from '@/hooks/usePdfInteraction';
 
 interface ModeSelectorProps {
-  mode: string;
-  onModeChange: (mode: 'select' | 'move' | 'resize' | 'zoom') => void;
+  mode: InteractionMode;
+  onModeChange: (mode: InteractionMode) => void;
 }
 
 const ModeSelector: React.FC<ModeSelectorProps> = ({ mode, onModeChange }) => {
   return (
     <ToggleGroup type="single" value={mode} onValueChange={(value) => {
-      if (value) onModeChange(value as 'select' | 'move' | 'resize' | 'zoom');
+      if (value) onModeChange(value as InteractionMode);
     }}>
       <ToggleGroupItem value="select" aria-label="Select mode" title="Select area">
         <PointerIcon className="h-4 w-4" />

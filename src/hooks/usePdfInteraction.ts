@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useCallback } from 'react';
 import { Tag } from '@/lib/types';
 import usePdfTagSelection from './usePdfTagSelection';
 import usePdfSelectionState from './usePdfSelectionState';
@@ -13,6 +14,8 @@ interface UsePdfInteractionProps {
   onZoomToRegion?: (region: { x: number, y: number, width: number, height: number }) => void;
 }
 
+export type InteractionMode = 'select' | 'move' | 'resize' | 'zoom';
+
 export default function usePdfInteraction({
   pdfDimensions,
   existingTags,
@@ -20,30 +23,19 @@ export default function usePdfInteraction({
   onTagUpdated,
   onZoomToRegion
 }: UsePdfInteractionProps) {
-  // Update the type to include 'zoom' as a valid mode
-  const [mode, setMode] = useState<'select' | 'move' | 'resize' | 'zoom'>('select');
+  const [mode, setMode] = useState<InteractionMode>('select');
   
-  const {
-    isSelecting, 
-    setIsSelecting,
-    startPos, 
-    setStartPos,
-    currentPos, 
-    setCurrentPos,
-    selectionPurpose,
-    setSelectionPurpose
-  } = usePdfSelectionState();
+  const [
+    { isSelecting, startPos, currentPos, selectionPurpose },
+    { setIsSelecting, setStartPos, setCurrentPos, setSelectionPurpose, resetSelection }
+  ] = usePdfSelectionState();
   
-  const { 
-    selectedTagId, 
-    setSelectedTagId,
-    resizeHandle, 
-    setResizeHandle,
-    moveOffset, 
-    setMoveOffset
-  } = usePdfTagSelection();
+  const [
+    { selectedTagId, resizeHandle, moveOffset },
+    { setSelectedTagId, setResizeHandle, setMoveOffset, resetTagSelection }
+  ] = usePdfTagSelection();
 
-  const handleMouseDown = (e: React.MouseEvent, containerRect: DOMRect) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent, containerRect: DOMRect) => {
     const x = e.clientX - containerRect.left;
     const y = e.clientY - containerRect.top;
 
@@ -88,9 +80,20 @@ export default function usePdfInteraction({
         }
       }
     }
-  };
+  }, [
+    mode, 
+    pdfDimensions, 
+    existingTags, 
+    setStartPos, 
+    setCurrentPos, 
+    setIsSelecting, 
+    setSelectedTagId, 
+    setSelectionPurpose, 
+    setMoveOffset, 
+    setResizeHandle
+  ]);
 
-  const handleMouseMove = (e: React.MouseEvent, containerRect: DOMRect) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent, containerRect: DOMRect) => {
     if (!isSelecting) return;
 
     const x = Math.max(0, Math.min(e.clientX - containerRect.left, containerRect.width));
@@ -139,9 +142,19 @@ export default function usePdfInteraction({
         }
       }
     }
-  };
+  }, [
+    isSelecting,
+    selectedTagId,
+    mode,
+    moveOffset,
+    resizeHandle,
+    existingTags,
+    pdfDimensions,
+    onTagUpdated,
+    setCurrentPos
+  ]);
 
-  const handleMouseUp = (containerRect: DOMRect) => {
+  const handleMouseUp = useCallback((containerRect: DOMRect) => {
     if (!isSelecting) return;
     
     // Calculate selection rectangle
@@ -172,23 +185,32 @@ export default function usePdfInteraction({
       }
     }
     
-    setIsSelecting(false);
-    setSelectedTagId(null);
-    setResizeHandle(null);
-    setSelectionPurpose(null);
-  };
-
-  return {
+    resetSelection();
+    resetTagSelection();
+  }, [
     isSelecting,
     startPos,
     currentPos,
     mode,
+    selectionPurpose,
+    pdfDimensions,
+    onRegionSelected,
+    onZoomToRegion,
+    resetSelection,
+    resetTagSelection
+  ]);
+
+  return {
+    mode,
+    setMode,
+    isSelecting,
+    startPos,
+    currentPos,
     selectedTagId,
     resizeHandle,
     selectionPurpose,
     handleMouseDown,
     handleMouseMove,
-    handleMouseUp,
-    setMode
+    handleMouseUp
   };
 }

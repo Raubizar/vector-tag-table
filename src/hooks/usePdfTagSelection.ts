@@ -1,27 +1,33 @@
 
 import { useState } from 'react';
-import { Tag } from '@/lib/types';
+import { Position } from './usePdfSelectionState';
 
 export interface TagSelectionState {
   selectedTagId: string | null;
-  setSelectedTagId: (id: string | null) => void;
   resizeHandle: string | null;
-  setResizeHandle: (handle: string | null) => void;
-  moveOffset: { x: number; y: number };
-  setMoveOffset: (offset: { x: number; y: number }) => void;
+  moveOffset: Position;
 }
 
-export default function usePdfTagSelection(): TagSelectionState {
+export interface TagSelectionActions {
+  setSelectedTagId: (id: string | null) => void;
+  setResizeHandle: (handle: string | null) => void;
+  setMoveOffset: (offset: Position) => void;
+  resetTagSelection: () => void;
+}
+
+export default function usePdfTagSelection(): [TagSelectionState, TagSelectionActions] {
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
-  const [moveOffset, setMoveOffset] = useState({ x: 0, y: 0 });
+  const [moveOffset, setMoveOffset] = useState<Position>({ x: 0, y: 0 });
   
-  return {
-    selectedTagId,
-    setSelectedTagId,
-    resizeHandle,
-    setResizeHandle,
-    moveOffset,
-    setMoveOffset
+  const resetTagSelection = () => {
+    setSelectedTagId(null);
+    setResizeHandle(null);
+    setMoveOffset({ x: 0, y: 0 });
   };
+  
+  return [
+    { selectedTagId, resizeHandle, moveOffset },
+    { setSelectedTagId, setResizeHandle, setMoveOffset, resetTagSelection }
+  ];
 }

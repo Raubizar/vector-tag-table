@@ -1,8 +1,9 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, forwardRef } from 'react';
 import { PDFDocument, Tag } from '@/lib/types';
 import PDFCanvas from './PDFCanvas';
 import TagOverlay from './TagOverlay';
+import { InteractionMode } from '@/hooks/usePdfInteraction';
 
 interface PDFViewerContentProps {
   document: PDFDocument;
@@ -12,7 +13,7 @@ interface PDFViewerContentProps {
   isSelecting: boolean;
   startPos: { x: number; y: number };
   currentPos: { x: number; y: number };
-  mode: 'select' | 'move' | 'resize' | 'zoom';
+  mode: InteractionMode;
   selectionPurpose: 'tag' | 'zoom' | null;
   selectedTagId: string | null;
   existingTags: Tag[];
@@ -20,7 +21,7 @@ interface PDFViewerContentProps {
   onContainerInteraction: (event: React.MouseEvent) => void;
 }
 
-const PDFViewerContent: React.FC<PDFViewerContentProps> = ({
+const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
   document,
   currentPage,
   scale,
@@ -34,8 +35,9 @@ const PDFViewerContent: React.FC<PDFViewerContentProps> = ({
   existingTags,
   onDimensionsChange,
   onContainerInteraction
-}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+}, ref) => {
+  const innerRef = useRef<HTMLDivElement>(null);
+  const containerRefToUse = (ref || innerRef) as React.RefObject<HTMLDivElement>;
   
   const selectionStyle = {
     left: `${Math.min(startPos.x, currentPos.x)}px`,
@@ -49,7 +51,7 @@ const PDFViewerContent: React.FC<PDFViewerContentProps> = ({
 
   return (
     <div
-      ref={containerRef}
+      ref={containerRefToUse}
       className="relative"
       onMouseDown={onContainerInteraction}
       onMouseMove={onContainerInteraction}
@@ -72,10 +74,10 @@ const PDFViewerContent: React.FC<PDFViewerContentProps> = ({
       
       {/* Render existing tags */}
       {existingTags.map((tag) => {
-        if (!containerRef.current) return null;
+        if (!containerRefToUse.current) return null;
         
         // Calculate proper scale factor based on rendered PDF size vs container size
-        const scaleFactor = pdfDimensions.width / (containerRef.current.clientWidth || 1);
+        const scaleFactor = pdfDimensions.width / (containerRefToUse.current.clientWidth || 1);
         const isSelected = selectedTagId === tag.id;
         
         return (
@@ -90,6 +92,8 @@ const PDFViewerContent: React.FC<PDFViewerContentProps> = ({
       })}
     </div>
   );
-};
+});
+
+PDFViewerContent.displayName = 'PDFViewerContent';
 
 export default PDFViewerContent;

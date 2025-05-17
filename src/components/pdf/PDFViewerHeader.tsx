@@ -3,13 +3,14 @@ import React from 'react';
 import { PDFDocument } from '@/lib/types';
 import ModeSelector from './ModeSelector';
 import ZoomControls from './ZoomControls';
+import { InteractionMode } from '@/hooks/usePdfInteraction';
 
 interface PDFViewerHeaderProps {
   document: PDFDocument;
   currentPage: number;
-  mode: 'select' | 'move' | 'resize' | 'zoom';
+  mode: InteractionMode;
   scale: number;
-  onModeChange: (mode: 'select' | 'move' | 'resize' | 'zoom') => void;
+  onModeChange: (mode: InteractionMode) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetZoom: () => void;

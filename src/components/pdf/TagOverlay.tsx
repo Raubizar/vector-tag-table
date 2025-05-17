@@ -1,12 +1,13 @@
 
 import React from 'react';
 import { Tag } from '@/lib/types';
+import { InteractionMode } from '@/hooks/usePdfInteraction';
 
 interface TagOverlayProps {
   tag: Tag;
   scaleFactor: number;
   isSelected: boolean;
-  mode: 'select' | 'move' | 'resize' | 'zoom';
+  mode: InteractionMode;
 }
 
 const TagOverlay: React.FC<TagOverlayProps> = ({ tag, scaleFactor, isSelected, mode }) => {

@@ -3,6 +3,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { PDFDocument, Tag } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import usePdfInteraction from '@/hooks/usePdfInteraction';
+import usePdfZoom from '@/hooks/usePdfZoom';
 import PDFViewerHeader from './pdf/PDFViewerHeader';
 import PDFViewerContent from './pdf/PDFViewerContent';
 
@@ -23,56 +24,19 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
-  const [scale, setScale] = useState(1);
-  const [viewportOffset, setViewportOffset] = useState({ x: 0, y: 0 });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  // Handle zoom to region
-  const handleZoomToRegion = useCallback((region: { x: number, y: number, width: number, height: number }) => {
-    if (!containerRef.current || !scrollContainerRef.current) return;
-    
-    // Calculate new scale to fit the region with some padding
-    const containerWidth = scrollContainerRef.current.clientWidth;
-    const containerHeight = scrollContainerRef.current.clientHeight;
-    
-    // Calculate the scale needed to fit the selection in the viewport (with padding)
-    const padding = 20; // pixels of padding around the selection
-    const scaleX = (containerWidth - 2 * padding) / region.width;
-    const scaleY = (containerHeight - 2 * padding) / region.height;
-    const newScale = Math.min(Math.min(scaleX, scaleY), 3); // Cap at 3x zoom
-    
-    // Set the new scale
-    setScale(newScale);
-    
-    // After scale update, scroll to center the region
-    setTimeout(() => {
-      if (!scrollContainerRef.current) return;
-      
-      // Calculate the scroll position to center on the region
-      const targetX = region.x * newScale - (containerWidth - region.width * newScale) / 2;
-      const targetY = region.y * newScale - (containerHeight - region.height * newScale) / 2;
-      
-      // Set scroll position
-      scrollContainerRef.current.scrollLeft = Math.max(0, targetX);
-      scrollContainerRef.current.scrollTop = Math.max(0, targetY);
-    }, 100);
-  }, []);
+  // Use our refactored zoom hook
+  const {
+    scale,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
+    handleScaleChange,
+    zoomToRegion
+  } = usePdfZoom({ scrollContainerRef });
   
-  // Listen for auto-zoom events
-  useEffect(() => {
-    const handleAutoZoom = (e: CustomEvent) => {
-      if (e.detail) {
-        handleZoomToRegion(e.detail);
-      }
-    };
-    
-    window.document.addEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
-    
-    return () => {
-      window.document.removeEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
-    };
-  }, [handleZoomToRegion]);
-  
+  // Use our refactored interaction hook
   const {
     isSelecting,
     startPos,
@@ -89,19 +53,23 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     existingTags,
     onRegionSelected,
     onTagUpdated,
-    onZoomToRegion: handleZoomToRegion
+    onZoomToRegion: zoomToRegion
   });
-
-  const handleZoomIn = () => setScale(prev => Math.min(3, prev + 0.1));
-  const handleZoomOut = () => setScale(prev => Math.max(0.4, prev - 0.1));
-  const handleResetZoom = () => {
-    setScale(1);
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft = 0;
-      scrollContainerRef.current.scrollTop = 0;
-    }
-  };
-  const handleScaleChange = (newScale: number) => setScale(newScale);
+  
+  // Listen for auto-zoom events
+  useEffect(() => {
+    const handleAutoZoom = (e: CustomEvent) => {
+      if (e.detail) {
+        zoomToRegion(e.detail);
+      }
+    };
+    
+    window.document.addEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
+    
+    return () => {
+      window.document.removeEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
+    };
+  }, [zoomToRegion]);
 
   const handleContainerInteraction = (event: React.MouseEvent) => {
     if (!containerRef.current) return;
@@ -136,6 +104,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           className="overflow-auto max-h-[70vh] relative"
         >
           <PDFViewerContent
+            ref={containerRef}
             document={document}
             currentPage={currentPage}
             scale={scale}
