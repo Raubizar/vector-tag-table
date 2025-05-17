@@ -43,8 +43,8 @@ export const renderPdfPage = async (
   // Calculate viewport
   const viewport = page.getViewport({ scale });
   
-  // Create canvas
-  const canvas = document.createElement('canvas');
+  // Create canvas using the browser's document object
+  const canvas = window.document.createElement('canvas');
   const context = canvas.getContext('2d');
   
   if (!context) {
