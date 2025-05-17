@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import PDFViewer from '@/components/PDFViewer';
@@ -6,6 +7,9 @@ import DocumentSelector from '@/components/DocumentSelector';
 import ActionsPanel from '@/components/ActionsPanel';
 import { PDFDocument, Tag } from '@/lib/types';
 import extractionLogger from '@/lib/pdf/extractionLogger';
+import { toast } from '@/components/ui/sonner';
+import { extractTextFromAllDocuments } from '@/lib/pdf/batchExtraction';
+import { saveResults } from '@/lib/store';
 
 interface CreateTagTabProps {
   documents: PDFDocument[];
@@ -48,18 +52,16 @@ const CreateTagTab: React.FC<CreateTagTabProps> = ({
       return;
     }
 
-    setIsProcessing(true);
-
+    // Use onExtractText prop instead of trying to manage state locally
     try {
       // Enable logging for this extraction
       extractionLogger.enable();
       extractionLogger.reset();
       
-      const extractionResults = await extractTextFromAllDocuments(documents, tags);
-      setResults(extractionResults);
-      saveResults(extractionResults);
+      // Call the parent component's extract function
+      await onExtractText();
       
-      toast.success(`Extracted ${extractionResults.length} results from the first page of each document`);
+      toast.success(`Extraction completed successfully`);
       onViewResults();
       
     } catch (error) {
@@ -71,9 +73,6 @@ const CreateTagTab: React.FC<CreateTagTabProps> = ({
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
       });
-      
-    } finally {
-      setIsProcessing(false);
     }
   };
 
