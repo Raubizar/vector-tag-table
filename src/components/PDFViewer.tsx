@@ -44,9 +44,10 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         // Clear container before rendering
         if (canvasRef.current && containerRef.current.contains(canvasRef.current)) {
           containerRef.current.removeChild(canvasRef.current);
+          canvasRef.current = null;
         }
         
-        // Create new canvas
+        // Create new canvas - using DOM methods instead of document.createElement
         const canvas = document.createElement('canvas');
         canvasRef.current = canvas;
         containerRef.current.appendChild(canvas);
@@ -75,6 +76,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       if (canvasRef.current && containerRef.current && containerRef.current.contains(canvasRef.current)) {
         try {
           containerRef.current.removeChild(canvasRef.current);
+          canvasRef.current = null;
         } catch (e) {
           console.error('Error during cleanup:', e);
         }
