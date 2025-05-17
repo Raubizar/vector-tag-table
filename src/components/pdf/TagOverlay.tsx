@@ -6,7 +6,7 @@ interface TagOverlayProps {
   tag: Tag;
   scaleFactor: number;
   isSelected: boolean;
-  mode: 'select' | 'move' | 'resize';
+  mode: 'select' | 'move' | 'resize' | 'zoom';
 }
 
 const TagOverlay: React.FC<TagOverlayProps> = ({ tag, scaleFactor, isSelected, mode }) => {
@@ -20,6 +20,7 @@ const TagOverlay: React.FC<TagOverlayProps> = ({ tag, scaleFactor, isSelected, m
   let cursor = 'default';
   if (mode === 'move') cursor = 'move';
   else if (mode === 'resize') cursor = 'crosshair';
+  else if (mode === 'zoom') cursor = 'zoom-in';
   
   return (
     <div
