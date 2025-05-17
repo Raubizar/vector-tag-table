@@ -29,8 +29,8 @@ export const extractTextElementsFromPage = async (
     
     // Extract text content with compatible options for PDF.js
     const textContent = await page.getTextContent({
-      includeMarkedContent: true,
-      disableCombineTextItems: false // Enable text combining for better extraction
+      includeMarkedContent: true
+      // Removed disableCombineTextItems as it's not compatible with the type
     });
     
     // Get page viewport (default scale = 1.0)

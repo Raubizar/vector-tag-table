@@ -1,6 +1,7 @@
 
 import { PDFDocument, Tag, ExtractionResult, TextElement } from '../types';
 import { extractTextFromRegion, extractTextElementsFromPage } from './textExtraction';
+import { createPdfLoadingTask } from './core';
 
 export const extractTextFromAllDocuments = async (
   documents: PDFDocument[],
