@@ -44,8 +44,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     onTagUpdated
   });
 
-  const handleZoomIn = () => setScale(prev => Math.min(3, prev + 0.2));
-  const handleZoomOut = () => setScale(prev => Math.max(0.4, prev - 0.2));
+  const handleZoomIn = () => setScale(prev => Math.min(3, prev + 0.1));
+  const handleZoomOut = () => setScale(prev => Math.max(0.4, prev - 0.1));
   const handleResetZoom = () => setScale(1);
   const handleScaleChange = (newScale: number) => setScale(newScale);
 
@@ -116,6 +116,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             {existingTags.map((tag) => {
               if (!containerRef.current) return null;
               
+              // Calculate proper scale factor based on rendered PDF size vs container size
               const scaleFactor = pdfDimensions.width / (containerRef.current.clientWidth || 1);
               const isSelected = selectedTagId === tag.id;
               

@@ -1,5 +1,5 @@
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Tag } from '@/lib/types';
 
 interface UsePdfInteractionProps {
@@ -21,11 +21,13 @@ export default function usePdfInteraction({
   const [mode, setMode] = useState<'select' | 'move' | 'resize'>('select');
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  const [moveOffset, setMoveOffset] = useState({ x: 0, y: 0 });
 
   const handleMouseDown = (e: React.MouseEvent, containerRect: DOMRect) => {
     const x = e.clientX - containerRect.left;
     const y = e.clientY - containerRect.top;
 
+    // Set start and current positions
     setStartPos({ x, y });
     setCurrentPos({ x, y });
 
@@ -48,11 +50,19 @@ export default function usePdfInteraction({
           setSelectedTagId(tag.id);
           setIsSelecting(true);
           
+          // Save offset for move mode
+          if (mode === 'move') {
+            setMoveOffset({
+              x: x - tagLeft, 
+              y: y - tagTop
+            });
+          }
+          
           // For resize mode, determine which handle was clicked
           if (mode === 'resize') {
             const handleSize = 10;
             
-            // Check corners
+            // Check corners for resize handles
             if (Math.abs(x - tagLeft) < handleSize && Math.abs(y - tagTop) < handleSize) {
               setResizeHandle('top-left');
             } else if (Math.abs(x - tagRight) < handleSize && Math.abs(y - tagTop) < handleSize) {
@@ -84,50 +94,50 @@ export default function usePdfInteraction({
       
       if (selectedTag) {
         if (mode === 'move') {
-          // Calculate movement delta
-          const deltaX = (x - startPos.x) * scaleFactor;
-          const deltaY = (y - startPos.y) * scaleFactor;
+          // Calculate new position accounting for the offset
+          const newX = x - moveOffset.x;
+          const newY = y - moveOffset.y;
           
           // Update tag position
           const newRegion = {
-            x: selectedTag.region.x + deltaX,
-            y: selectedTag.region.y + deltaY,
+            x: newX * scaleFactor,
+            y: newY * scaleFactor,
             width: selectedTag.region.width,
             height: selectedTag.region.height
           };
           
-          // Store the new position in startPos for continuous movement
-          setStartPos({ x, y });
-          
           onTagUpdated(selectedTagId, newRegion);
         } else if (mode === 'resize' && resizeHandle) {
-          let newRegion = { ...selectedTag.region };
           const tagLeft = selectedTag.region.x / scaleFactor;
           const tagTop = selectedTag.region.y / scaleFactor;
+          const tagRight = tagLeft + selectedTag.region.width / scaleFactor;
+          const tagBottom = tagTop + selectedTag.region.height / scaleFactor;
+          
+          let newRegion = { ...selectedTag.region };
           
           // Handle resizing based on which corner was grabbed
           switch (resizeHandle) {
             case 'top-left':
               newRegion = {
-                x: selectedTag.region.x + (x - tagLeft) * scaleFactor,
-                y: selectedTag.region.y + (y - tagTop) * scaleFactor,
-                width: selectedTag.region.width - (x - tagLeft) * scaleFactor,
-                height: selectedTag.region.height - (y - tagTop) * scaleFactor
+                x: x * scaleFactor,
+                y: y * scaleFactor,
+                width: (tagRight - x) * scaleFactor,
+                height: (tagBottom - y) * scaleFactor
               };
               break;
             case 'top-right':
               newRegion = {
                 x: selectedTag.region.x,
-                y: selectedTag.region.y + (y - tagTop) * scaleFactor,
+                y: y * scaleFactor,
                 width: (x - tagLeft) * scaleFactor,
-                height: selectedTag.region.height - (y - tagTop) * scaleFactor
+                height: (tagBottom - y) * scaleFactor
               };
               break;
             case 'bottom-left':
               newRegion = {
-                x: selectedTag.region.x + (x - tagLeft) * scaleFactor,
+                x: x * scaleFactor,
                 y: selectedTag.region.y,
-                width: selectedTag.region.width - (x - tagLeft) * scaleFactor,
+                width: (tagRight - x) * scaleFactor,
                 height: (y - tagTop) * scaleFactor
               };
               break;
@@ -170,22 +180,19 @@ export default function usePdfInteraction({
       const height = Math.abs(currentPos.y - startPos.y);
 
       // Ignore very small selections (likely clicks)
-      if (width < 10 || height < 10) {
-        setIsSelecting(false);
-        return;
+      if (width > 5 && height > 5) {
+        // Convert to PDF coordinates
+        const scaleFactor = pdfDimensions.width / (containerRect.width || 1);
+        
+        const region = {
+          x: x * scaleFactor,
+          y: y * scaleFactor,
+          width: width * scaleFactor,
+          height: height * scaleFactor
+        };
+
+        onRegionSelected(region);
       }
-
-      // Convert to PDF coordinates
-      const scaleFactor = pdfDimensions.width / (containerRect.width || 1);
-      
-      const region = {
-        x: x * scaleFactor,
-        y: y * scaleFactor,
-        width: width * scaleFactor,
-        height: height * scaleFactor
-      };
-
-      onRegionSelected(region);
     }
     
     setIsSelecting(false);

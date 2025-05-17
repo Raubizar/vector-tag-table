@@ -16,16 +16,23 @@ const TagOverlay: React.FC<TagOverlayProps> = ({ tag, scaleFactor, isSelected, m
   const width = isFinite(tag.region.width / scaleFactor) ? tag.region.width / scaleFactor : 0;
   const height = isFinite(tag.region.height / scaleFactor) ? tag.region.height / scaleFactor : 0;
   
+  // Determine cursor based on mode
+  let cursor = 'default';
+  if (mode === 'move') cursor = 'move';
+  else if (mode === 'resize') cursor = 'crosshair';
+  
   return (
     <div
-      className={`absolute border-2 ${isSelected ? 'border-2 border-yellow-500' : ''} pointer-events-none`}
+      className={`absolute ${isSelected ? 'border-2 border-yellow-500' : 'border'}`}
       style={{
         left: `${left}px`,
         top: `${top}px`,
         width: `${width}px`,
         height: `${height}px`,
         borderColor: tag.color,
-        backgroundColor: `${tag.color}33`
+        backgroundColor: `${tag.color}33`,
+        cursor: cursor,
+        pointerEvents: 'auto', // Allow mouse events
       }}
     >
       <span
@@ -38,10 +45,10 @@ const TagOverlay: React.FC<TagOverlayProps> = ({ tag, scaleFactor, isSelected, m
       {/* Resize handles - shown only for selected tag in resize mode */}
       {isSelected && mode === 'resize' && (
         <>
-          <div className="absolute w-2 h-2 bg-white border border-black cursor-nwse-resize -top-1 -left-1 z-10" />
-          <div className="absolute w-2 h-2 bg-white border border-black cursor-nesw-resize -top-1 -right-1 z-10" />
-          <div className="absolute w-2 h-2 bg-white border border-black cursor-nesw-resize -bottom-1 -left-1 z-10" />
-          <div className="absolute w-2 h-2 bg-white border border-black cursor-nwse-resize -bottom-1 -right-1 z-10" />
+          <div className="absolute w-3 h-3 bg-white border border-black cursor-nwse-resize -top-1.5 -left-1.5 z-10" />
+          <div className="absolute w-3 h-3 bg-white border border-black cursor-nesw-resize -top-1.5 -right-1.5 z-10" />
+          <div className="absolute w-3 h-3 bg-white border border-black cursor-nesw-resize -bottom-1.5 -left-1.5 z-10" />
+          <div className="absolute w-3 h-3 bg-white border border-black cursor-nwse-resize -bottom-1.5 -right-1.5 z-10" />
         </>
       )}
     </div>

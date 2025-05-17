@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ExtractionResult } from '@/lib/types';
 import {
   Table,
@@ -23,10 +23,10 @@ interface ResultsTableProps {
 }
 
 const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
-  const [sortColumn, setSortColumn] = useState<keyof ExtractionResult>('fileName');
+  const [sortColumn, setSortColumn] = useState<string>('fileName');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  const handleSort = (column: keyof ExtractionResult) => {
+  const handleSort = (column: string) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -35,31 +35,86 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
     }
   };
 
-  const sortedResults = [...results].sort((a, b) => {
-    if (a[sortColumn] < b[sortColumn]) {
-      return sortDirection === 'asc' ? -1 : 1;
-    }
-    if (a[sortColumn] > b[sortColumn]) {
-      return sortDirection === 'asc' ? 1 : -1;
-    }
-    return 0;
-  });
+  // Transform results into document-based rows with columns for each tag
+  const { documentRows, uniqueTags } = useMemo(() => {
+    // Get unique tags
+    const tags = [...new Set(results.map(result => result.tagName))];
+    
+    // Group results by document
+    const documentMap = new Map<string, any>();
+    
+    results.forEach(result => {
+      const key = `${result.documentId}-${result.pageNumber}`;
+      
+      if (!documentMap.has(key)) {
+        documentMap.set(key, {
+          id: key,
+          documentId: result.documentId,
+          fileName: result.fileName,
+          pageNumber: result.pageNumber,
+          tags: {}
+        });
+      }
+      
+      // Add this tag's extracted text to the document
+      documentMap.get(key).tags[result.tagName] = result.extractedText;
+    });
+    
+    return {
+      documentRows: Array.from(documentMap.values()),
+      uniqueTags: tags
+    };
+  }, [results]);
+
+  // Sort the document rows
+  const sortedRows = useMemo(() => {
+    return [...documentRows].sort((a, b) => {
+      if (sortColumn === 'fileName' || sortColumn === 'pageNumber') {
+        if (a[sortColumn] < b[sortColumn]) {
+          return sortDirection === 'asc' ? -1 : 1;
+        }
+        if (a[sortColumn] > b[sortColumn]) {
+          return sortDirection === 'asc' ? 1 : -1;
+        }
+        return 0;
+      } else {
+        // Sorting by tag column
+        const aValue = a.tags[sortColumn] || '';
+        const bValue = b.tags[sortColumn] || '';
+        
+        if (aValue < bValue) {
+          return sortDirection === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortDirection === 'asc' ? 1 : -1;
+        }
+        return 0;
+      }
+    });
+  }, [documentRows, sortColumn, sortDirection]);
 
   const exportToCsv = () => {
     if (results.length === 0) return;
 
-    const headers = ['File Name', 'Page', 'Tag Name', 'Extracted Text'];
+    // Include all tag columns in the header
+    const headers = ['File Name', 'Page', ...uniqueTags];
     
     const csvRows = [
       headers.join(','),
-      ...sortedResults.map(result => 
-        [
-          `"${result.fileName}"`,
-          result.pageNumber,
-          `"${result.tagName}"`,
-          `"${result.extractedText.replace(/"/g, '""')}"`
-        ].join(',')
-      )
+      ...sortedRows.map(row => {
+        const cells = [
+          `"${row.fileName}"`,
+          row.pageNumber
+        ];
+        
+        // Add cells for each tag
+        for (const tag of uniqueTags) {
+          const text = row.tags[tag] || '';
+          cells.push(`"${text.replace(/"/g, '""')}"`);
+        }
+        
+        return cells.join(',');
+      })
     ];
 
     const csvContent = csvRows.join('\n');
@@ -96,12 +151,12 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
         </div>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer whitespace-nowrap"
                 onClick={() => handleSort('fileName')}
               >
                 File Name {sortColumn === 'fileName' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -112,31 +167,40 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
               >
                 Page {sortColumn === 'pageNumber' && (sortDirection === 'asc' ? '↑' : '↓')}
               </TableHead>
-              <TableHead 
-                className="cursor-pointer"
-                onClick={() => handleSort('tagName')}
-              >
-                Tag Name {sortColumn === 'tagName' && (sortDirection === 'asc' ? '↑' : '↓')}
-              </TableHead>
-              <TableHead>Extracted Text</TableHead>
+              
+              {/* Create a column for each unique tag */}
+              {uniqueTags.map(tag => (
+                <TableHead 
+                  key={tag}
+                  className="cursor-pointer whitespace-nowrap"
+                  onClick={() => handleSort(tag)}
+                >
+                  {tag} {sortColumn === tag && (sortDirection === 'asc' ? '↑' : '↓')}
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedResults.length === 0 ? (
+            {sortedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-gray-500">
+                <TableCell colSpan={2 + uniqueTags.length} className="text-center py-6 text-gray-500">
                   No extraction results yet
                 </TableCell>
               </TableRow>
             ) : (
-              sortedResults.map((result) => (
-                <TableRow key={result.id}>
+              sortedRows.map((row) => (
+                <TableRow key={row.id}>
                   <TableCell className="font-medium max-w-xs truncate">
-                    {result.fileName}
+                    {row.fileName}
                   </TableCell>
-                  <TableCell>{result.pageNumber}</TableCell>
-                  <TableCell>{result.tagName}</TableCell>
-                  <TableCell>{result.extractedText}</TableCell>
+                  <TableCell>{row.pageNumber}</TableCell>
+                  
+                  {/* Add cells for each tag */}
+                  {uniqueTags.map(tag => (
+                    <TableCell key={`${row.id}-${tag}`}>
+                      {row.tags[tag] || ''}
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))
             )}
