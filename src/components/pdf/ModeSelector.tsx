@@ -1,45 +1,35 @@
 
 import React from 'react';
-import { Move } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PointerIcon, MoveIcon, StretchIcon, ZoomInIcon } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface ModeSelectorProps {
-  mode: 'select' | 'move' | 'resize';
-  onModeChange: (mode: 'select' | 'move' | 'resize') => void;
+  mode: string;
+  onModeChange: (mode: 'select' | 'move' | 'resize' | 'zoom') => void;
 }
 
 const ModeSelector: React.FC<ModeSelectorProps> = ({ mode, onModeChange }) => {
   return (
-    <div className="flex items-center space-x-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onModeChange('select')}
-        className={`p-1 ${mode === 'select' ? 'bg-blue-100' : ''}`}
-        title="Select Mode"
-      >
-        Select
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onModeChange('move')}
-        className={`p-1 ${mode === 'move' ? 'bg-blue-100' : ''}`}
-        title="Move Mode"
-      >
-        <Move className="h-4 w-4 mr-1" />
-        Move
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onModeChange('resize')}
-        className={`p-1 ${mode === 'resize' ? 'bg-blue-100' : ''}`}
-        title="Resize Mode"
-      >
-        Resize
-      </Button>
-    </div>
+    <ToggleGroup type="single" value={mode} onValueChange={(value) => {
+      if (value) onModeChange(value as 'select' | 'move' | 'resize' | 'zoom');
+    }}>
+      <ToggleGroupItem value="select" aria-label="Select mode" title="Select area">
+        <PointerIcon className="h-4 w-4" />
+      </ToggleGroupItem>
+      
+      <ToggleGroupItem value="move" aria-label="Move mode" title="Move tags">
+        <MoveIcon className="h-4 w-4" />
+      </ToggleGroupItem>
+      
+      <ToggleGroupItem value="resize" aria-label="Resize mode" title="Resize tags">
+        <StretchIcon className="h-4 w-4" />
+      </ToggleGroupItem>
+      
+      <ToggleGroupItem value="zoom" aria-label="Zoom mode" title="Zoom to selection">
+        <ZoomInIcon className="h-4 w-4" />
+      </ToggleGroupItem>
+    </ToggleGroup>
   );
 };
 

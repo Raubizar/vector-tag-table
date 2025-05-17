@@ -11,15 +11,17 @@ interface UsePdfInteractionProps {
   existingTags: Tag[];
   onRegionSelected: (region: Tag['region']) => void;
   onTagUpdated?: (tagId: string, newRegion: Tag['region']) => void;
+  onZoomToRegion?: (region: { x: number, y: number, width: number, height: number }) => void;
 }
 
 export default function usePdfInteraction({
   pdfDimensions,
   existingTags,
   onRegionSelected,
-  onTagUpdated
+  onTagUpdated,
+  onZoomToRegion
 }: UsePdfInteractionProps) {
-  const [mode, setMode] = useState<'select' | 'move' | 'resize'>('select');
+  const [mode, setMode] = useState<'select' | 'move' | 'resize' | 'zoom'>('select');
   
   const {
     isSelecting, 
@@ -27,7 +29,9 @@ export default function usePdfInteraction({
     startPos, 
     setStartPos,
     currentPos, 
-    setCurrentPos
+    setCurrentPos,
+    selectionPurpose,
+    setSelectionPurpose
   } = usePdfSelectionState();
   
   const { 
@@ -51,6 +55,11 @@ export default function usePdfInteraction({
     if (mode === 'select') {
       setIsSelecting(true);
       setSelectedTagId(null);
+      setSelectionPurpose('tag');
+    } else if (mode === 'zoom') {
+      setIsSelecting(true);
+      setSelectedTagId(null);
+      setSelectionPurpose('zoom');
     } else if (mode === 'move' || mode === 'resize') {
       // Check if clicking on an existing tag
       const scaleFactor = pdfDimensions.width / (containerRect.width || 1);
@@ -135,16 +144,16 @@ export default function usePdfInteraction({
   const handleMouseUp = (containerRect: DOMRect) => {
     if (!isSelecting) return;
     
-    // For selection mode, create a new tag
-    if (mode === 'select' && !selectedTagId) {
-      // Calculate selection rectangle
-      const x = Math.min(startPos.x, currentPos.x);
-      const y = Math.min(startPos.y, currentPos.y);
-      const width = Math.abs(currentPos.x - startPos.x);
-      const height = Math.abs(currentPos.y - startPos.y);
+    // Calculate selection rectangle
+    const x = Math.min(startPos.x, currentPos.x);
+    const y = Math.min(startPos.y, currentPos.y);
+    const width = Math.abs(currentPos.x - startPos.x);
+    const height = Math.abs(currentPos.y - startPos.y);
 
-      // Ignore very small selections (likely clicks)
-      if (width > 5 && height > 5) {
+    // Ignore very small selections (likely clicks)
+    if (width > 5 && height > 5) {
+      // For selection mode, create a new tag
+      if (mode === 'select' && selectionPurpose === 'tag') {
         // Convert to PDF coordinates
         const scaleFactor = pdfDimensions.width / (containerRect.width || 1);
         
@@ -157,11 +166,16 @@ export default function usePdfInteraction({
 
         onRegionSelected(region);
       }
+      // For zoom mode, zoom to the selected area
+      else if (mode === 'zoom' && selectionPurpose === 'zoom' && onZoomToRegion) {
+        onZoomToRegion({ x, y, width, height });
+      }
     }
     
     setIsSelecting(false);
     setSelectedTagId(null);
     setResizeHandle(null);
+    setSelectionPurpose(null);
   };
 
   return {
@@ -171,6 +185,7 @@ export default function usePdfInteraction({
     mode,
     selectedTagId,
     resizeHandle,
+    selectionPurpose,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

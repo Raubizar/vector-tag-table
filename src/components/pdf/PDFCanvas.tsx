@@ -19,12 +19,24 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastRenderAttemptRef = useRef<{
+    documentId: string;
+    page: number;
+    scale: number;
+  } | null>(null);
 
   useEffect(() => {
     const renderPdf = async () => {
       if (!containerRef.current || !document.data) return;
       
       try {
+        // Record this render attempt to avoid duplicate renders
+        lastRenderAttemptRef.current = {
+          documentId: document.id,
+          page: currentPage,
+          scale
+        };
+        
         // Clear container before rendering
         if (canvasRef.current && containerRef.current.contains(canvasRef.current)) {
           containerRef.current.removeChild(canvasRef.current);
@@ -38,6 +50,11 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
         
         // Create a copy of the ArrayBuffer to prevent detachment
         const dataClone = new Uint8Array(document.data).buffer;
+        
+        // Show loading message for large PDFs at high zoom
+        if (scale > 1.5) {
+          console.log("Rendering large PDF at high zoom level:", scale);
+        }
         
         const dimensions = await renderPdfPage(
           containerRef.current,
@@ -53,10 +70,14 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
       }
     };
 
-    renderPdf();
+    // Add a small delay when zooming to prevent too many render calls
+    const renderTimer = setTimeout(() => {
+      renderPdf();
+    }, 100);
     
     // Cleanup function
     return () => {
+      clearTimeout(renderTimer);
       if (canvasRef.current && containerRef.current && containerRef.current.contains(canvasRef.current)) {
         try {
           containerRef.current.removeChild(canvasRef.current);
