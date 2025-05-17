@@ -1,6 +1,10 @@
 
 import { useState } from 'react';
 import { Tag } from '@/lib/types';
+import usePdfTagSelection from './usePdfTagSelection';
+import usePdfSelectionState from './usePdfSelectionState';
+import { resizeTag } from './usePdfTagResize';
+import { findTagAtPosition, findResizeHandle } from '@/utils/pdfTagUtils';
 
 interface UsePdfInteractionProps {
   pdfDimensions: { width: number; height: number };
@@ -15,13 +19,25 @@ export default function usePdfInteraction({
   onRegionSelected,
   onTagUpdated
 }: UsePdfInteractionProps) {
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
   const [mode, setMode] = useState<'select' | 'move' | 'resize'>('select');
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
-  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
-  const [moveOffset, setMoveOffset] = useState({ x: 0, y: 0 });
+  
+  const {
+    isSelecting, 
+    setIsSelecting,
+    startPos, 
+    setStartPos,
+    currentPos, 
+    setCurrentPos
+  } = usePdfSelectionState();
+  
+  const { 
+    selectedTagId, 
+    setSelectedTagId,
+    resizeHandle, 
+    setResizeHandle,
+    moveOffset, 
+    setMoveOffset
+  } = usePdfTagSelection();
 
   const handleMouseDown = (e: React.MouseEvent, containerRect: DOMRect) => {
     const x = e.clientX - containerRect.left;
@@ -39,42 +55,27 @@ export default function usePdfInteraction({
       // Check if clicking on an existing tag
       const scaleFactor = pdfDimensions.width / (containerRect.width || 1);
       
-      for (const tag of existingTags) {
-        const tagLeft = tag.region.x / scaleFactor;
-        const tagTop = tag.region.y / scaleFactor;
-        const tagRight = tagLeft + tag.region.width / scaleFactor;
-        const tagBottom = tagTop + tag.region.height / scaleFactor;
-
-        // Check if click is inside tag
-        if (x >= tagLeft && x <= tagRight && y >= tagTop && y <= tagBottom) {
-          setSelectedTagId(tag.id);
-          setIsSelecting(true);
+      const tagUnderCursor = findTagAtPosition(x, y, existingTags, scaleFactor);
+      
+      if (tagUnderCursor) {
+        setSelectedTagId(tagUnderCursor.id);
+        setIsSelecting(true);
+        
+        // Save offset for move mode
+        if (mode === 'move') {
+          const tagLeft = tagUnderCursor.region.x / scaleFactor;
+          const tagTop = tagUnderCursor.region.y / scaleFactor;
           
-          // Save offset for move mode
-          if (mode === 'move') {
-            setMoveOffset({
-              x: x - tagLeft, 
-              y: y - tagTop
-            });
-          }
-          
-          // For resize mode, determine which handle was clicked
-          if (mode === 'resize') {
-            const handleSize = 10;
-            
-            // Check corners for resize handles
-            if (Math.abs(x - tagLeft) < handleSize && Math.abs(y - tagTop) < handleSize) {
-              setResizeHandle('top-left');
-            } else if (Math.abs(x - tagRight) < handleSize && Math.abs(y - tagTop) < handleSize) {
-              setResizeHandle('top-right');
-            } else if (Math.abs(x - tagLeft) < handleSize && Math.abs(y - tagBottom) < handleSize) {
-              setResizeHandle('bottom-left');
-            } else if (Math.abs(x - tagRight) < handleSize && Math.abs(y - tagBottom) < handleSize) {
-              setResizeHandle('bottom-right');
-            }
-          }
-          
-          break;
+          setMoveOffset({
+            x: x - tagLeft, 
+            y: y - tagTop
+          });
+        }
+        
+        // For resize mode, determine which handle was clicked
+        if (mode === 'resize') {
+          const handleResult = findResizeHandle(x, y, tagUnderCursor, scaleFactor);
+          setResizeHandle(handleResult);
         }
       }
     }
@@ -113,54 +114,17 @@ export default function usePdfInteraction({
           const tagRight = tagLeft + selectedTag.region.width / scaleFactor;
           const tagBottom = tagTop + selectedTag.region.height / scaleFactor;
           
-          let newRegion = { ...selectedTag.region };
-          
-          // Handle resizing based on which corner was grabbed
-          switch (resizeHandle) {
-            case 'top-left':
-              newRegion = {
-                x: x * scaleFactor,
-                y: y * scaleFactor,
-                width: (tagRight - x) * scaleFactor,
-                height: (tagBottom - y) * scaleFactor
-              };
-              break;
-            case 'top-right':
-              newRegion = {
-                x: selectedTag.region.x,
-                y: y * scaleFactor,
-                width: (x - tagLeft) * scaleFactor,
-                height: (tagBottom - y) * scaleFactor
-              };
-              break;
-            case 'bottom-left':
-              newRegion = {
-                x: x * scaleFactor,
-                y: selectedTag.region.y,
-                width: (tagRight - x) * scaleFactor,
-                height: (y - tagTop) * scaleFactor
-              };
-              break;
-            case 'bottom-right':
-              newRegion = {
-                x: selectedTag.region.x,
-                y: selectedTag.region.y,
-                width: (x - tagLeft) * scaleFactor,
-                height: (y - tagTop) * scaleFactor
-              };
-              break;
-          }
-          
-          // Ensure width and height are positive
-          if (newRegion.width < 0) {
-            newRegion.x = newRegion.x + newRegion.width;
-            newRegion.width = Math.abs(newRegion.width);
-          }
-          
-          if (newRegion.height < 0) {
-            newRegion.y = newRegion.y + newRegion.height;
-            newRegion.height = Math.abs(newRegion.height);
-          }
+          const newRegion = resizeTag({
+            selectedTag,
+            x,
+            y,
+            resizeHandle,
+            tagLeft,
+            tagTop,
+            tagRight,
+            tagBottom,
+            scaleFactor
+          });
           
           onTagUpdated(selectedTagId, newRegion);
         }
