@@ -52,12 +52,17 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
           documentId: result.documentId,
           fileName: result.fileName,
           pageNumber: result.pageNumber,
-          tags: {}
+          tags: {},
+          // Store the full results with metadata for potential future use
+          fullResults: {}
         });
       }
       
       // Add this tag's extracted text to the document
       documentMap.get(key).tags[result.tagName] = result.extractedText;
+      
+      // Store the full result object including metadata
+      documentMap.get(key).fullResults[result.tagName] = result;
     });
     
     return {

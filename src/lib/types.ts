@@ -18,6 +18,18 @@ export interface PDFDocument {
   data?: ArrayBuffer;
 }
 
+export interface TextElement {
+  text: string;
+  position: {
+    x: number;
+    y: number;
+  };
+  width: number;
+  height: number;
+  fontSize: number;
+  fontName: string;
+}
+
 export interface ExtractionResult {
   id: string;
   documentId: string;
@@ -26,4 +38,5 @@ export interface ExtractionResult {
   tagId: string;
   tagName: string;
   extractedText: string;
+  textElements?: TextElement[]; // Optional array of text elements with metadata
 }
