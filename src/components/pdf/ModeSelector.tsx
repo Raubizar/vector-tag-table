@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { PointerIcon, MoveIcon, StretchIcon, ZoomInIcon } from 'lucide-react';
+import { PointerIcon, MoveIcon, ZoomInIcon } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface ModeSelectorProps {
@@ -23,7 +23,12 @@ const ModeSelector: React.FC<ModeSelectorProps> = ({ mode, onModeChange }) => {
       </ToggleGroupItem>
       
       <ToggleGroupItem value="resize" aria-label="Resize mode" title="Resize tags">
-        <StretchIcon className="h-4 w-4" />
+        {/* Changed from StretchIcon to make it work with available icons */}
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <line x1="4" y1="12" x2="20" y2="12" />
+          <line x1="12" y1="4" x2="12" y2="20" />
+        </svg>
       </ToggleGroupItem>
       
       <ToggleGroupItem value="zoom" aria-label="Zoom mode" title="Zoom to selection">
