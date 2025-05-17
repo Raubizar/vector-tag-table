@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -159,6 +158,25 @@ const Index = () => {
     toast.info('All data cleared');
   };
 
+  // Add function to handle tag region updates
+  const handleTagRegionUpdate = (tagId: string, newRegion: Tag['region']) => {
+    setTags(prev => 
+      prev.map(tag => 
+        tag.id === tagId 
+          ? { ...tag, region: newRegion } 
+          : tag
+      )
+    );
+    
+    // Save updated tags to storage
+    const updatedTags = tags.map(tag => 
+      tag.id === tagId 
+        ? { ...tag, region: newRegion } 
+        : tag
+    );
+    saveTags(updatedTags);
+  };
+
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="mb-8 text-center">
@@ -208,7 +226,7 @@ const Index = () => {
                 <CardHeader>
                   <CardTitle>Document Preview</CardTitle>
                   <CardDescription>
-                    Select a region on page 1 to create a new tag
+                    Select a region on page 1 to create a new tag, or use the move/resize tools to adjust existing tags
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -219,6 +237,7 @@ const Index = () => {
                         currentPage={1} // Always show page 1
                         onRegionSelected={handleRegionSelected}
                         existingTags={tags}
+                        onTagUpdated={handleTagRegionUpdate}
                       />
                       
                       {/* Hide page navigation since we're only using page 1 */}

@@ -1,3 +1,4 @@
+
 import * as pdfjs from 'pdfjs-dist';
 import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 import { PDFDocument, Tag, ExtractionResult } from './types';
@@ -29,8 +30,11 @@ export const renderPdfPage = async (
   // Clear container
   container.innerHTML = '';
   
+  // Create a copy of the ArrayBuffer to prevent it from being detached
+  const dataClone = new Uint8Array(data).buffer;
+  
   // Load PDF document
-  const loadingTask = pdfjs.getDocument({ data });
+  const loadingTask = pdfjs.getDocument({ data: dataClone });
   const pdf = await loadingTask.promise;
   
   // Get page
@@ -73,8 +77,11 @@ export const extractTextFromRegion = async (
   pageNumber: number,
   region: Tag['region']
 ): Promise<string> => {
+  // Create a copy of the ArrayBuffer to prevent it from being detached
+  const dataClone = new Uint8Array(data).buffer;
+  
   // Load PDF document
-  const loadingTask = pdfjs.getDocument({ data });
+  const loadingTask = pdfjs.getDocument({ data: dataClone });
   const pdf = await loadingTask.promise;
   
   // Get page
@@ -121,31 +128,39 @@ export const extractTextFromAllDocuments = async (
     // Only process the first page of each document
     const pageNum = 1;
     
-    // Load PDF document
-    const loadingTask = pdfjs.getDocument({ data: document.data });
-    const pdf = await loadingTask.promise;
-    
-    // For each tag, extract text from the defined region
-    for (const tag of tags) {
-      if (pageNum <= pdf.numPages) { // Make sure the document has at least one page
-        const extractedText = await extractTextFromRegion(
-          document.data,
-          pageNum,
-          tag.region
-        );
-        
-        if (extractedText) {
-          results.push({
-            id: `${document.id}-${pageNum}-${tag.id}`,
-            documentId: document.id,
-            fileName: document.name,
-            pageNumber: pageNum,
-            tagId: tag.id,
-            tagName: tag.name,
-            extractedText
-          });
+    try {
+      // Create a copy of the ArrayBuffer to prevent it from being detached
+      const dataClone = new Uint8Array(document.data).buffer;
+      
+      // Load PDF document
+      const loadingTask = pdfjs.getDocument({ data: dataClone });
+      const pdf = await loadingTask.promise;
+      
+      // For each tag, extract text from the defined region
+      for (const tag of tags) {
+        if (pageNum <= pdf.numPages) { // Make sure the document has at least one page
+          const extractedText = await extractTextFromRegion(
+            document.data,
+            pageNum,
+            tag.region
+          );
+          
+          if (extractedText) {
+            results.push({
+              id: `${document.id}-${pageNum}-${tag.id}`,
+              documentId: document.id,
+              fileName: document.name,
+              pageNumber: pageNum,
+              tagId: tag.id,
+              tagName: tag.name,
+              extractedText
+            });
+          }
         }
       }
+    } catch (error) {
+      console.error(`Error processing document ${document.name}:`, error);
+      // Continue with next document rather than failing the entire batch
     }
   }
   
