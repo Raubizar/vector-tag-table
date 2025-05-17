@@ -1,10 +1,10 @@
 
 import * as pdfjs from 'pdfjs-dist';
+import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 import { PDFDocument, Tag, ExtractionResult } from './types';
 
 // Initialize PDF.js worker
-const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.mjs');
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+pdfjs.GlobalWorkerOptions.workerPath = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
 export const loadPdfDocument = async (file: File): Promise<ArrayBuffer> => {
   return new Promise((resolve, reject) => {
@@ -91,7 +91,7 @@ export const extractTextFromRegion = async (
   let extractedText = '';
   
   for (const item of textContent.items) {
-    const textItem = item as pdfjs.TextItem;
+    const textItem = item as TextItem;
     const tx = textItem.transform;
     const textX = tx[4]; // x position
     const textY = viewport.height - tx[5]; // y position (PDF coordinates start from bottom)
