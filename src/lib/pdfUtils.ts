@@ -1,10 +1,9 @@
-
 import * as pdfjs from 'pdfjs-dist';
 import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 import { PDFDocument, Tag, ExtractionResult } from './types';
 
 // Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerPath = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
 export const loadPdfDocument = async (file: File): Promise<ArrayBuffer> => {
   return new Promise((resolve, reject) => {
@@ -119,14 +118,16 @@ export const extractTextFromAllDocuments = async (
   for (const document of documents) {
     if (!document.data) continue;
     
+    // Only process the first page of each document
+    const pageNum = 1;
+    
     // Load PDF document
     const loadingTask = pdfjs.getDocument({ data: document.data });
     const pdf = await loadingTask.promise;
     
-    // Process all pages
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      // For each tag, extract text from the defined region
-      for (const tag of tags) {
+    // For each tag, extract text from the defined region
+    for (const tag of tags) {
+      if (pageNum <= pdf.numPages) { // Make sure the document has at least one page
         const extractedText = await extractTextFromRegion(
           document.data,
           pageNum,

@@ -28,6 +28,7 @@ const Index = () => {
   const [results, setResults] = useState<ExtractionResult[]>([]);
   const [activeTab, setActiveTab] = useState('upload');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isFirstVisit, setIsFirstVisit] = useState(true);
 
   // Load saved tags and results on component mount
   useEffect(() => {
@@ -56,14 +57,18 @@ const Index = () => {
       setDocuments(prev => [...prev, ...documentsWithData]);
       saveDocuments([...documents, ...documentsWithData]);
 
-      // Set the current document if it's the first one
-      if (!currentDocument) {
+      // Set the first document as current
+      if (documentsWithData.length > 0 && !currentDocument) {
         setCurrentDocument(documentsWithData[0]);
       }
       
-      // Auto-switch to create tag tab if we have documents
-      if (activeTab === 'upload') {
+      // If this is the first upload, immediately switch to tag creation
+      if (isFirstVisit && documentsWithData.length > 0) {
         setActiveTab('create-tag');
+        setIsFirstVisit(false);
+        toast.info('Now create a tag by selecting an area on the document', {
+          duration: 5000,
+        });
       }
     } catch (error) {
       console.error('Error loading PDF data:', error);
@@ -87,6 +92,12 @@ const Index = () => {
     setCurrentTag(null);
     
     toast.success(`Tag "${newTag.name}" created`);
+    
+    // Automatically run extraction if we have documents and at least one tag
+    if (documents.length > 0 && tags.length === 0) {
+      // Only auto-extract after the first tag is created
+      handleExtractText();
+    }
   };
 
   const handleDeleteTag = (id: string) => {
@@ -119,7 +130,7 @@ const Index = () => {
       setResults(extractionResults);
       saveResults(extractionResults);
       
-      toast.success(`Extracted ${extractionResults.length} results`);
+      toast.success(`Extracted ${extractionResults.length} results from the first page of each document`);
       setActiveTab('results');
     } catch (error) {
       console.error('Error extracting text:', error);
@@ -140,6 +151,7 @@ const Index = () => {
     setTags([]);
     setCurrentTag(null);
     setResults([]);
+    setIsFirstVisit(true);
     
     // Clear local storage
     localStorage.clear();
@@ -152,7 +164,7 @@ const Index = () => {
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold mb-2">PDF Tagging & Extraction</h1>
         <p className="text-gray-600">
-          Upload PDF documents, create tags for specific regions, and extract text data
+          Upload PDF documents, create tags on the first page, and extract text data
         </p>
       </div>
 
@@ -172,7 +184,7 @@ const Index = () => {
             <CardHeader>
               <CardTitle>Upload PDF Documents</CardTitle>
               <CardDescription>
-                Bulk upload multiple vector PDFs from Revit, AutoCAD, or similar software
+                Upload multiple PDF documents to extract information from
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -196,7 +208,7 @@ const Index = () => {
                 <CardHeader>
                   <CardTitle>Document Preview</CardTitle>
                   <CardDescription>
-                    Select a region to create a new tag
+                    Select a region on page 1 to create a new tag
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -204,27 +216,12 @@ const Index = () => {
                     <div className="space-y-4">
                       <PDFViewer
                         document={currentDocument}
-                        currentPage={currentPage}
+                        currentPage={1} // Always show page 1
                         onRegionSelected={handleRegionSelected}
                         existingTags={tags}
                       />
                       
-                      <div className="flex justify-between items-center">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleChangePage(-1)}
-                          disabled={currentPage <= 1}
-                        >
-                          Previous Page
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          onClick={() => handleChangePage(1)}
-                        >
-                          Next Page
-                        </Button>
-                      </div>
+                      {/* Hide page navigation since we're only using page 1 */}
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-500">
@@ -297,7 +294,7 @@ const Index = () => {
                       disabled={isProcessing || documents.length === 0 || tags.length === 0}
                       className="w-full"
                     >
-                      {isProcessing ? 'Processing...' : 'Extract Text from All Documents'}
+                      {isProcessing ? 'Processing...' : 'Extract Text from First Page of All Documents'}
                     </Button>
                     
                     <Button
@@ -328,7 +325,7 @@ const Index = () => {
             <CardHeader>
               <CardTitle>Extraction Results</CardTitle>
               <CardDescription>
-                View and export extracted text from your documents
+                View extracted text from the first page of each document
               </CardDescription>
             </CardHeader>
             <CardContent>
