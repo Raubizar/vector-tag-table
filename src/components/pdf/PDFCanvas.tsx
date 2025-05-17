@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { renderPdfPage } from '@/lib/pdf/render';
 import { PDFDocument } from '@/lib/types';
