@@ -102,12 +102,7 @@ export const renderPdfPage = async (
         viewport: adjustedViewport,
         // Enhanced rendering options
         enableWebGL: true,
-        renderInteractiveForms: false,
-        // Use image smoothing for high quality when zoomed in
-        canvasContext: {
-          ...context,
-          imageSmoothingEnabled: options.useHighQualityRendering
-        }
+        renderInteractiveForms: false
       };
       
       // Show rendering progress for large PDFs
@@ -136,12 +131,7 @@ export const renderPdfPage = async (
       const renderContext = {
         canvasContext: context,
         viewport,
-        enableWebGL: true,
-        // Use image smoothing for high quality when zoomed in
-        canvasContext: {
-          ...context,
-          imageSmoothingEnabled: options.useHighQualityRendering
-        }
+        enableWebGL: true
       };
       
       await page.render(renderContext).promise;
@@ -199,10 +189,9 @@ export const extractTextFromRegion = async (
     // Get page
     const page = await pdf.getPage(pageNumber);
     
-    // Extract text content with more options
+    // Extract text content with more options for PDF.js
     const textContent = await page.getTextContent({
-      normalizeWhitespace: options.cleanupText,
-      disableCombineTextItems: options.preserveFormatting,
+      disableCombineTextItems: options.preserveFormatting
     });
     
     // Get page viewport (default scale = 1.0)

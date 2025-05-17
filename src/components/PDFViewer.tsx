@@ -64,17 +64,17 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   
   // Listen for auto-zoom events
   useEffect(() => {
-    const handleAutoZoom = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail) {
-        handleZoomToRegion(customEvent.detail);
+    const handleAutoZoom = (e: CustomEvent) => {
+      if (e.detail) {
+        handleZoomToRegion(e.detail);
       }
     };
     
-    document.addEventListener('auto-zoom-to-region', handleAutoZoom);
+    // Use window.document instead of document
+    window.document.addEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
     
     return () => {
-      document.removeEventListener('auto-zoom-to-region', handleAutoZoom);
+      window.document.removeEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
     };
   }, [handleZoomToRegion]);
   

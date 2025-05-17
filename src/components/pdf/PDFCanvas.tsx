@@ -103,7 +103,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
             const zoomEvent = new CustomEvent('auto-zoom-to-region', { 
               detail: targetRegion
             });
-            document.dispatchEvent(zoomEvent);
+            window.document.dispatchEvent(zoomEvent);
             
             toast.info("Auto-zoomed to A4 size area");
           }, 500);
