@@ -24,6 +24,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   onTagUpdated
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
@@ -37,23 +38,48 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
 
   useEffect(() => {
     const renderPdf = async () => {
-      if (containerRef.current && document.data) {
-        try {
-          const dimensions = await renderPdfPage(
-            containerRef.current,
-            document.data,
-            currentPage,
-            scale
-          );
-          setPdfDimensions(dimensions);
-        } catch (error) {
-          console.error('Error rendering PDF:', error);
-          toast.error('Failed to render PDF');
+      if (!containerRef.current || !document.data) return;
+      
+      try {
+        // Clear container before rendering
+        if (canvasRef.current && containerRef.current.contains(canvasRef.current)) {
+          containerRef.current.removeChild(canvasRef.current);
         }
+        
+        // Create new canvas
+        const canvas = document.createElement('canvas');
+        canvasRef.current = canvas;
+        containerRef.current.appendChild(canvas);
+        
+        // Create a copy of the ArrayBuffer to prevent detachment
+        const dataClone = new Uint8Array(document.data).buffer;
+        
+        const dimensions = await renderPdfPage(
+          canvas,
+          dataClone,
+          currentPage,
+          scale
+        );
+        
+        setPdfDimensions(dimensions);
+      } catch (error) {
+        console.error('Error rendering PDF:', error);
+        toast.error('Failed to render PDF');
       }
     };
 
     renderPdf();
+    
+    // Cleanup function
+    return () => {
+      if (canvasRef.current && containerRef.current && containerRef.current.contains(canvasRef.current)) {
+        try {
+          containerRef.current.removeChild(canvasRef.current);
+        } catch (e) {
+          console.error('Error during cleanup:', e);
+        }
+      }
+    };
   }, [document, currentPage, scale]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -72,7 +98,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       setSelectedTagId(null);
     } else if (mode === 'move' || mode === 'resize') {
       // Check if clicking on an existing tag
-      const scaleFactor = pdfDimensions.width / containerRef.current.clientWidth;
+      const scaleFactor = pdfDimensions.width / (containerRef.current.clientWidth || 1);
       
       for (const tag of existingTags) {
         const tagLeft = tag.region.x / scaleFactor;
@@ -118,7 +144,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     setCurrentPos({ x, y });
 
     if (selectedTagId && onTagUpdated) {
-      const scaleFactor = pdfDimensions.width / containerRef.current.clientWidth;
+      const scaleFactor = pdfDimensions.width / (containerRef.current.clientWidth || 1);
       const selectedTag = existingTags.find(tag => tag.id === selectedTagId);
       
       if (selectedTag) {
@@ -127,7 +153,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           const deltaX = (x - startPos.x) * scaleFactor;
           const deltaY = (y - startPos.y) * scaleFactor;
           
-          // Update tag position, but don't actually call onTagUpdated until mouse up
+          // Update tag position
           const newRegion = {
             x: selectedTag.region.x + deltaX,
             y: selectedTag.region.y + deltaY,
@@ -143,8 +169,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           let newRegion = { ...selectedTag.region };
           const tagLeft = selectedTag.region.x / scaleFactor;
           const tagTop = selectedTag.region.y / scaleFactor;
-          const tagRight = tagLeft + selectedTag.region.width / scaleFactor;
-          const tagBottom = tagTop + selectedTag.region.height / scaleFactor;
           
           // Handle resizing based on which corner was grabbed
           switch (resizeHandle) {
@@ -203,7 +227,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     if (!isSelecting) return;
     
     // For selection mode, create a new tag
-    if (mode === 'select' && !selectedTagId) {
+    if (mode === 'select' && !selectedTagId && containerRef.current) {
       // Calculate selection rectangle
       const x = Math.min(startPos.x, currentPos.x);
       const y = Math.min(startPos.y, currentPos.y);
@@ -217,7 +241,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       }
 
       // Convert to PDF coordinates
-      const scaleFactor = pdfDimensions.width / containerRef.current!.clientWidth;
+      const scaleFactor = pdfDimensions.width / (containerRef.current.clientWidth || 1);
       
       const region = {
         x: x * scaleFactor,
@@ -239,10 +263,10 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const handleResetZoom = () => setScale(1);
 
   const selectionStyle = {
-    left: Math.min(startPos.x, currentPos.x),
-    top: Math.min(startPos.y, currentPos.y),
-    width: Math.abs(currentPos.x - startPos.x),
-    height: Math.abs(currentPos.y - startPos.y),
+    left: `${Math.min(startPos.x, currentPos.x)}px`,
+    top: `${Math.min(startPos.y, currentPos.y)}px`,
+    width: `${Math.abs(currentPos.x - startPos.x)}px`,
+    height: `${Math.abs(currentPos.y - startPos.y)}px`,
     display: isSelecting && !selectedTagId ? 'block' : 'none'
   };
 
@@ -333,8 +357,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            style={{ minHeight: "200px" }}
           >
-            {/* PDF will be rendered here */}
+            {/* PDF will be rendered here by the useEffect */}
+            
+            {/* Selection box overlay */}
             <div
               className="absolute border-2 border-blue-500 bg-blue-200 bg-opacity-30 pointer-events-none"
               style={selectionStyle}
@@ -342,18 +369,26 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             
             {/* Render existing tags */}
             {existingTags.map((tag) => {
-              const scaleFactor = pdfDimensions.width / (containerRef.current?.clientWidth || 1);
+              if (!containerRef.current) return null;
+              
+              const scaleFactor = pdfDimensions.width / (containerRef.current.clientWidth || 1);
               const isSelected = selectedTagId === tag.id;
+              
+              // Prevent Infinity values in CSS by ensuring valid dimensions
+              const left = isFinite(tag.region.x / scaleFactor) ? tag.region.x / scaleFactor : 0;
+              const top = isFinite(tag.region.y / scaleFactor) ? tag.region.y / scaleFactor : 0;
+              const width = isFinite(tag.region.width / scaleFactor) ? tag.region.width / scaleFactor : 0;
+              const height = isFinite(tag.region.height / scaleFactor) ? tag.region.height / scaleFactor : 0;
               
               return (
                 <div
                   key={tag.id}
                   className={`absolute border-2 ${isSelected ? 'border-2 border-yellow-500' : ''} pointer-events-none`}
                   style={{
-                    left: tag.region.x / scaleFactor,
-                    top: tag.region.y / scaleFactor,
-                    width: tag.region.width / scaleFactor,
-                    height: tag.region.height / scaleFactor,
+                    left: `${left}px`,
+                    top: `${top}px`,
+                    width: `${width}px`,
+                    height: `${height}px`,
                     borderColor: tag.color,
                     backgroundColor: `${tag.color}33`
                   }}
