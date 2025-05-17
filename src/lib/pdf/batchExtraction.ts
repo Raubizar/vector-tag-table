@@ -9,7 +9,10 @@ export const extractTextFromAllDocuments = async (
   const results: ExtractionResult[] = [];
   
   for (const document of documents) {
-    if (!document.data) continue;
+    if (!document.data) {
+      console.error(`Document ${document.name} has no data`);
+      continue;
+    }
     
     // Only process the first page of each document
     const pageNum = 1;
@@ -24,6 +27,23 @@ export const extractTextFromAllDocuments = async (
       // Extract all text elements from the page once - this is more efficient
       const allTextElements = await extractTextElementsFromPage(dataClone, pageNum);
       
+      if (allTextElements.length === 0) {
+        // No text elements found in the document
+        for (const tag of tags) {
+          results.push({
+            id: `${document.id}-${pageNum}-${tag.id}`,
+            documentId: document.id,
+            fileName: document.name,
+            pageNumber: pageNum,
+            tagId: tag.id, 
+            tagName: tag.name,
+            extractedText: '[No text found in document - may be scanned/image-based PDF]',
+            errorCode: 'NO_TEXT_CONTENT'
+          });
+        }
+        continue;
+      }
+      
       for (const tag of tags) {
         // Filter text elements within the tag region
         const textElementsInRegion = allTextElements.filter(element => 
@@ -32,6 +52,22 @@ export const extractTextFromAllDocuments = async (
           element.position.y >= tag.region.y &&
           element.position.y <= (tag.region.y + tag.region.height)
         );
+        
+        if (textElementsInRegion.length === 0) {
+          // No text found in this specific tag region
+          documentResults.push({
+            id: `${document.id}-${pageNum}-${tag.id}`,
+            documentId: document.id,
+            fileName: document.name,
+            pageNumber: pageNum,
+            tagId: tag.id,
+            tagName: tag.name,
+            extractedText: '[No text found in this region]',
+            textElements: [],
+            errorCode: 'EMPTY_REGION'
+          });
+          continue;
+        }
         
         // Sort elements by position for proper reading order
         const sortedElements = [...textElementsInRegion].sort((a, b) => {
@@ -106,11 +142,33 @@ export const extractTextFromAllDocuments = async (
           pageNumber: pageNum,
           tagId: tag.id, 
           tagName: tag.name,
-          extractedText: '[Error processing document]'
+          extractedText: `[Error processing document: ${error instanceof Error ? error.message : 'Unknown error'}]`,
+          errorCode: 'PROCESSING_ERROR'
         });
       }
     }
   }
   
   return results;
+};
+
+// Helper function to check if a PDF is likely to be scanned/image-based
+export const isProbablyScannedPdf = async (data: ArrayBuffer): Promise<boolean> => {
+  try {
+    const dataClone = new Uint8Array(data).buffer;
+    const loadingTask = createPdfLoadingTask(dataClone);
+    const pdf = await loadingTask.promise;
+    
+    // Get first page
+    const page = await pdf.getPage(1);
+    
+    // Extract text content
+    const textContent = await page.getTextContent();
+    
+    // If there are very few text items, it's likely a scanned document
+    return textContent.items.length < 5;
+  } catch (error) {
+    console.error('Error checking if PDF is scanned:', error);
+    return false;
+  }
 };

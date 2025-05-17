@@ -17,6 +17,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ResultsTableProps {
   results: ExtractionResult[];
@@ -53,6 +60,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
           fileName: result.fileName,
           pageNumber: result.pageNumber,
           tags: {},
+          errors: {},
           // Store the full results with metadata for potential future use
           fullResults: {}
         });
@@ -60,6 +68,11 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
       
       // Add this tag's extracted text to the document
       documentMap.get(key).tags[result.tagName] = result.extractedText;
+      
+      // Store error code if present
+      if (result.errorCode) {
+        documentMap.get(key).errors[result.tagName] = result.errorCode;
+      }
       
       // Store the full result object including metadata
       documentMap.get(key).fullResults[result.tagName] = result;
@@ -135,6 +148,44 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
     toast.success('CSV file downloaded');
   };
 
+  // Render appropriate content for a cell based on the text value and error status
+  const renderCellContent = (text: string, errorCode?: string) => {
+    if (!text) return '';
+    
+    // Check for error messages
+    if (text.startsWith('[Error') || text.startsWith('[No text')) {
+      return (
+        <div className="flex items-center text-amber-700">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex items-center">
+                  <Info className="w-4 h-4 mr-1" />
+                  {text}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs">
+                  {errorCode === 'NO_TEXT_CONTENT' && 
+                    "This document doesn't contain any extractable text. It may be a scanned or image-based PDF that requires OCR processing."
+                  }
+                  {errorCode === 'EMPTY_REGION' && 
+                    "No text was found in this tag region. Try adjusting the tag position to better cover the text."
+                  }
+                  {errorCode === 'PROCESSING_ERROR' && 
+                    "An error occurred while processing this document. Check the console for more details."
+                  }
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      );
+    }
+    
+    return text;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -203,7 +254,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
                   {/* Add cells for each tag */}
                   {uniqueTags.map(tag => (
                     <TableCell key={`${row.id}-${tag}`}>
-                      {row.tags[tag] || ''}
+                      {renderCellContent(row.tags[tag] || '', row.errors[tag])}
                     </TableCell>
                   ))}
                 </TableRow>

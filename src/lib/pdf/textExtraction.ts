@@ -9,6 +9,7 @@ export interface TextProcessingOptions {
   preserveFormatting?: boolean; // Keep paragraph breaks and indentation
   cleanupText?: boolean;        // Remove extra spaces, normalize whitespace
   ocrFallback?: boolean;        // Attempt OCR if text extraction fails
+  debug?: boolean;              // Enable debug mode for visualization
 }
 
 export const extractTextElementsFromPage = async (
@@ -16,8 +17,11 @@ export const extractTextElementsFromPage = async (
   pageNumber: number
 ): Promise<TextElement[]> => {
   try {
+    // Create a copy of the ArrayBuffer to prevent it from being detached
+    const dataClone = new Uint8Array(data).buffer;
+    
     // Load PDF document using the shared loading task creator
-    const loadingTask = createPdfLoadingTask(data);
+    const loadingTask = createPdfLoadingTask(dataClone);
     const pdf = await loadingTask.promise;
     
     // Get page
@@ -25,7 +29,8 @@ export const extractTextElementsFromPage = async (
     
     // Extract text content with compatible options for PDF.js
     const textContent = await page.getTextContent({
-      includeMarkedContent: true
+      includeMarkedContent: true,
+      disableCombineTextItems: false // Enable text combining for better extraction
     });
     
     // Get page viewport (default scale = 1.0)
@@ -73,8 +78,11 @@ export const extractTextFromRegion = async (
   options: TextProcessingOptions = { preserveFormatting: true, cleanupText: true, ocrFallback: true }
 ): Promise<string> => {
   try {
+    // Create a copy of the ArrayBuffer to prevent it from being detached
+    const dataClone = new Uint8Array(data).buffer;
+    
     // First extract all text elements from the page
-    const textElements = await extractTextElementsFromPage(data, pageNumber);
+    const textElements = await extractTextElementsFromPage(dataClone, pageNumber);
     
     // Filter text elements that are inside the region
     const elementsInRegion = textElements.filter(element => 
@@ -85,7 +93,11 @@ export const extractTextFromRegion = async (
     );
     
     if (elementsInRegion.length === 0) {
-      return options.ocrFallback ? '[OCR processing would be applied here for scanned documents]' : '';
+      // If no text found and OCR fallback is enabled
+      if (options.ocrFallback) {
+        return '[OCR processing would be applied here for scanned documents]';
+      }
+      return '';
     }
     
     // Sort elements by Y position (top to bottom) then X position (left to right)
@@ -149,7 +161,7 @@ export const extractTextFromRegion = async (
     return extractedText.trim();
   } catch (error) {
     console.error('Error extracting text from region:', error);
-    return '[Error extracting text]';
+    return '[Error extracting text: ' + (error instanceof Error ? error.message : 'Unknown error') + ']';
   }
 };
 
@@ -158,5 +170,77 @@ export const getTextElementsWithMetadata = async (
   data: ArrayBuffer,
   pageNumber: number
 ): Promise<TextElement[]> => {
-  return extractTextElementsFromPage(data, pageNumber);
+  // Create a copy of the ArrayBuffer to prevent it from being detached
+  const dataClone = new Uint8Array(data).buffer;
+  return extractTextElementsFromPage(dataClone, pageNumber);
+};
+
+// Visualize text elements on a canvas for debugging
+export const visualizeTextElements = async (
+  canvas: HTMLCanvasElement,
+  data: ArrayBuffer,
+  pageNumber: number,
+  selectedTagId?: string,
+  tags?: Tag[]
+): Promise<void> => {
+  try {
+    const dataClone = new Uint8Array(data).buffer;
+    const textElements = await extractTextElementsFromPage(dataClone, pageNumber);
+    
+    if (!canvas || textElements.length === 0) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw text element boxes
+    textElements.forEach((element) => {
+      ctx.strokeStyle = 'rgba(0, 128, 255, 0.5)';
+      ctx.lineWidth = 1;
+      
+      // Check if this text element is within any tag's region
+      let isInSelectedTag = false;
+      
+      if (tags && selectedTagId) {
+        const selectedTag = tags.find(tag => tag.id === selectedTagId);
+        if (selectedTag) {
+          const { x, y, width, height } = selectedTag.region;
+          isInSelectedTag = (
+            element.position.x >= x &&
+            element.position.x <= (x + width) &&
+            element.position.y >= y &&
+            element.position.y <= (y + height)
+          );
+        }
+      }
+      
+      // Highlight text elements in the selected tag
+      if (isInSelectedTag) {
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
+        ctx.lineWidth = 2;
+      }
+      
+      ctx.strokeRect(
+        element.position.x,
+        element.position.y,
+        element.width,
+        element.height
+      );
+      
+      // Add text label (optional)
+      if (isInSelectedTag) {
+        ctx.font = '10px Arial';
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
+        ctx.fillText(
+          element.text,
+          element.position.x,
+          element.position.y - 2
+        );
+      }
+    });
+  } catch (error) {
+    console.error('Error visualizing text elements:', error);
+  }
 };

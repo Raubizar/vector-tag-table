@@ -16,6 +16,7 @@ export interface PDFDocument {
   name: string;
   file: File;
   data?: ArrayBuffer;
+  isScanned?: boolean; // Flag to indicate if the document is likely scanned/image-based
 }
 
 export interface TextElement {
@@ -39,4 +40,12 @@ export interface ExtractionResult {
   tagName: string;
   extractedText: string;
   textElements?: TextElement[]; // Optional array of text elements with metadata
+  errorCode?: 'NO_TEXT_CONTENT' | 'EMPTY_REGION' | 'PROCESSING_ERROR' | string; // Error code for better debugging
+}
+
+// Debug settings for text extraction
+export interface TextExtractionDebugSettings {
+  showTextElements: boolean;
+  highlightTagRegions: boolean;
+  showMetadata: boolean;
 }

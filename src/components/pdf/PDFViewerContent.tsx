@@ -3,7 +3,9 @@ import React, { useRef, forwardRef } from 'react';
 import { PDFDocument, Tag } from '@/lib/types';
 import PDFCanvas from './PDFCanvas';
 import TagOverlay from './TagOverlay';
+import PDFTextDebug from './PDFTextDebug';
 import { InteractionMode } from '@/hooks/usePdfInteraction';
+import usePdfTextDebug from '@/hooks/usePdfTextDebug';
 
 interface PDFViewerContentProps {
   document: PDFDocument;
@@ -38,6 +40,12 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
 }, ref) => {
   const innerRef = useRef<HTMLDivElement>(null);
   const containerRefToUse = (ref || innerRef) as React.RefObject<HTMLDivElement>;
+  
+  // Use our new text debug hook
+  const [
+    { isDebugActive, debugSettings },
+    { toggleDebug, visualizeTextForCurrentPage }
+  ] = usePdfTextDebug(document, currentPage, existingTags, selectedTagId);
   
   const selectionStyle = {
     left: `${Math.min(startPos.x, currentPos.x)}px`,
@@ -90,6 +98,17 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
           />
         );
       })}
+      
+      {/* Text debugging overlay */}
+      <PDFTextDebug
+        document={document}
+        currentPage={currentPage}
+        tags={existingTags}
+        selectedTagId={selectedTagId}
+        isDebugActive={isDebugActive}
+        onToggleDebug={toggleDebug}
+        onVisualize={visualizeTextForCurrentPage}
+      />
     </div>
   );
 });
