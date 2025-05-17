@@ -1,6 +1,7 @@
 
 import * as pdfjs from 'pdfjs-dist';
 import { createPdfLoadingTask } from './core';
+import { cloneArrayBuffer } from './safeBufferUtils';
 
 // Enhanced rendering options for PDF pages
 export interface RenderOptions {
@@ -20,8 +21,12 @@ export const renderPdfPage = async (
   container.innerHTML = '';
   
   try {
+    // Create a safe copy of the data before passing to PDF.js
+    // PDF.js will detach this buffer, so we need to clone it
+    const safeData = cloneArrayBuffer(data);
+    
     // Create PDF loading task with optimized settings
-    const loadingTask = createPdfLoadingTask(data, options.enableProgressiveLoading);
+    const loadingTask = createPdfLoadingTask(safeData, options.enableProgressiveLoading);
     
     // Set empty password handler to avoid prompts
     loadingTask.onPassword = () => {}; 

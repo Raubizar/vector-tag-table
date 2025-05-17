@@ -4,3 +4,4 @@ export * from './core';
 export * from './render';
 export * from './textExtraction';
 export * from './batchExtraction';
+export * from './safeBufferUtils';

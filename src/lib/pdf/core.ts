@@ -1,5 +1,6 @@
 
 import * as pdfjs from 'pdfjs-dist';
+import { cloneArrayBuffer } from './safeBufferUtils';
 
 // Initialize PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -9,7 +10,9 @@ export const loadPdfDocument = async (file: File): Promise<ArrayBuffer> => {
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result instanceof ArrayBuffer) {
-        resolve(event.target.result);
+        // Return a clone of the buffer to prevent detachment
+        const safeBuffer = cloneArrayBuffer(event.target.result);
+        resolve(safeBuffer);
       } else {
         reject(new Error("Failed to read PDF file as ArrayBuffer"));
       }
@@ -22,7 +25,8 @@ export const loadPdfDocument = async (file: File): Promise<ArrayBuffer> => {
 // Helper function to create a PDF loading task with optimized settings
 export const createPdfLoadingTask = (data: ArrayBuffer, enableProgressiveLoading: boolean = false) => {
   // Create a copy of the ArrayBuffer to prevent it from being detached
-  const dataClone = new Uint8Array(data).buffer;
+  // This is critical as PDF.js will detach the buffer during processing
+  const dataClone = cloneArrayBuffer(data);
   
   // Enhanced options for handling large format PDFs
   return pdfjs.getDocument({

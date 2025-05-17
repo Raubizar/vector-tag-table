@@ -1,7 +1,9 @@
+
 import React, { useEffect, useRef } from 'react';
 import { renderPdfPage } from '@/lib/pdf/render';
 import { PDFDocument } from '@/lib/types';
 import { toast } from 'sonner';
+import { cloneArrayBuffer, isArrayBufferDetached } from '@/lib/pdf/safeBufferUtils';
 
 interface PDFCanvasProps {
   document: PDFDocument;
@@ -49,8 +51,24 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
         canvasRef.current = canvas;
         containerRef.current.appendChild(canvas);
         
-        // Create a copy of the ArrayBuffer to prevent detachment
-        const dataClone = new Uint8Array(document.data).buffer;
+        // Create a safe copy of the ArrayBuffer to prevent detachment
+        let pdfData: ArrayBuffer;
+        
+        try {
+          // Check if buffer is already detached and warn about it
+          if (isArrayBufferDetached(document.data)) {
+            console.warn("Document data was already detached, this might cause issues");
+            toast.error("Document buffer was detached. Try reloading the document.");
+            // Still try to clone, which will fail if the buffer is properly detached
+          }
+          
+          // Always create a fresh copy for each render operation
+          pdfData = cloneArrayBuffer(document.data);
+        } catch (err) {
+          console.error("Failed to clone buffer, it might be detached:", err);
+          toast.error("Failed to render PDF: buffer may be detached");
+          return;
+        }
         
         // Show loading message for large PDFs at high zoom
         if (scale > 1.5) {
@@ -60,7 +78,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
         // Render the PDF with optimized parameters for large format documents
         const dimensions = await renderPdfPage(
           containerRef.current,
-          dataClone,
+          pdfData,
           currentPage,
           scale,
           {
@@ -109,7 +127,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
         }
       } catch (error) {
         console.error('Error rendering PDF:', error);
-        toast.error('Failed to render PDF');
+        toast.error('Failed to render PDF. The file might be corrupted or too large.');
       }
     };
 

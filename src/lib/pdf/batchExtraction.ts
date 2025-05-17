@@ -3,6 +3,7 @@ import { PDFDocument, Tag, ExtractionResult, TextElement } from '../types';
 import { extractTextFromRegion, extractTextElementsFromPage } from './textExtraction';
 import { createPdfLoadingTask } from './core';
 import extractionLogger from './extractionLogger';
+import { cloneArrayBuffer, isArrayBufferDetached } from './safeBufferUtils';
 
 export const extractTextFromAllDocuments = async (
   documents: PDFDocument[],
@@ -36,8 +37,43 @@ export const extractTextFromAllDocuments = async (
       // Process all tags for this document
       const documentResults: ExtractionResult[] = [];
       
-      // Create a copy of the ArrayBuffer to prevent it from being detached
-      const dataClone = new Uint8Array(document.data).buffer;
+      // Check if buffer is detached and warn about it
+      let documentData: ArrayBuffer;
+      try {
+        if (isArrayBufferDetached(document.data)) {
+          console.warn(`Document data for ${document.name} was already detached`);
+          extractionLogger.logStep('Document data was detached', { 
+            documentName: document.name,
+            action: 'Attempting to recover'
+          });
+        }
+        
+        // Always create a fresh copy for this document processing
+        documentData = cloneArrayBuffer(document.data);
+        
+      } catch (err) {
+        console.error(`Failed to clone buffer for ${document.name}, it might be detached:`, err);
+        extractionLogger.logStep('Buffer cloning failed', { 
+          documentName: document.name,
+          error: err instanceof Error ? err.message : 'Unknown error'
+        });
+        
+        // Add error result for this document
+        for (const tag of tags) {
+          results.push({
+            id: `${document.id}-${pageNum}-${tag.id}`,
+            documentId: document.id,
+            fileName: document.name,
+            pageNumber: pageNum,
+            tagId: tag.id, 
+            tagName: tag.name,
+            extractedText: `[Error processing document: Buffer was detached]`,
+            errorCode: 'BUFFER_DETACHED'
+          });
+        }
+        
+        continue; // Skip to next document
+      }
       
       extractionLogger.logStep('Extracting text elements from page', { 
         documentName: document.name,
@@ -45,7 +81,9 @@ export const extractTextFromAllDocuments = async (
       });
       
       // Extract all text elements from the page once - this is more efficient
-      const allTextElements = await extractTextElementsFromPage(dataClone, pageNum);
+      // For each tag extraction, we must create a fresh copy of the buffer
+      const clonedBufferForExtraction = cloneArrayBuffer(documentData);
+      const allTextElements = await extractTextElementsFromPage(clonedBufferForExtraction, pageNum);
       
       extractionLogger.logStep('Text elements extracted', { 
         documentName: document.name,
@@ -237,8 +275,8 @@ export const extractTextFromAllDocuments = async (
 // Helper function to check if a PDF is likely to be scanned/image-based
 export const isProbablyScannedPdf = async (data: ArrayBuffer): Promise<boolean> => {
   try {
-    const dataClone = new Uint8Array(data).buffer;
-    const loadingTask = createPdfLoadingTask(dataClone);
+    const safeData = cloneArrayBuffer(data);
+    const loadingTask = createPdfLoadingTask(safeData);
     const pdf = await loadingTask.promise;
     
     // Get first page

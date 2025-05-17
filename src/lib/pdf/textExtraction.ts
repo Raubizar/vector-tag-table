@@ -1,8 +1,8 @@
-
 import * as pdfjs from 'pdfjs-dist';
 import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 import { Tag, PDFDocument, ExtractionResult, TextElement } from '../types';
 import { createPdfLoadingTask } from './core';
+import { cloneArrayBuffer } from './safeBufferUtils';
 
 // Text processing options for extraction
 export interface TextProcessingOptions {
@@ -17,11 +17,11 @@ export const extractTextElementsFromPage = async (
   pageNumber: number
 ): Promise<TextElement[]> => {
   try {
-    // Create a copy of the ArrayBuffer to prevent it from being detached
-    const dataClone = new Uint8Array(data).buffer;
+    // Create a fresh copy of the ArrayBuffer to prevent it from being detached
+    const safeData = cloneArrayBuffer(data);
     
     // Load PDF document using the shared loading task creator
-    const loadingTask = createPdfLoadingTask(dataClone);
+    const loadingTask = createPdfLoadingTask(safeData);
     const pdf = await loadingTask.promise;
     
     // Get page
@@ -78,11 +78,11 @@ export const extractTextFromRegion = async (
   options: TextProcessingOptions = { preserveFormatting: true, cleanupText: true, ocrFallback: true }
 ): Promise<string> => {
   try {
-    // Create a copy of the ArrayBuffer to prevent it from being detached
-    const dataClone = new Uint8Array(data).buffer;
+    // Create a fresh copy of the ArrayBuffer to prevent it from being detached
+    const safeData = cloneArrayBuffer(data);
     
     // First extract all text elements from the page
-    const textElements = await extractTextElementsFromPage(dataClone, pageNumber);
+    const textElements = await extractTextElementsFromPage(safeData, pageNumber);
     
     // Filter text elements that are inside the region
     const elementsInRegion = textElements.filter(element => 
@@ -171,8 +171,8 @@ export const getTextElementsWithMetadata = async (
   pageNumber: number
 ): Promise<TextElement[]> => {
   // Create a copy of the ArrayBuffer to prevent it from being detached
-  const dataClone = new Uint8Array(data).buffer;
-  return extractTextElementsFromPage(dataClone, pageNumber);
+  const safeData = cloneArrayBuffer(data);
+  return extractTextElementsFromPage(safeData, pageNumber);
 };
 
 // Visualize text elements on a canvas for debugging
@@ -184,8 +184,8 @@ export const visualizeTextElements = async (
   tags?: Tag[]
 ): Promise<void> => {
   try {
-    const dataClone = new Uint8Array(data).buffer;
-    const textElements = await extractTextElementsFromPage(dataClone, pageNumber);
+    const safeData = cloneArrayBuffer(data);
+    const textElements = await extractTextElementsFromPage(safeData, pageNumber);
     
     if (!canvas || textElements.length === 0) return;
     
