@@ -2,7 +2,8 @@
 import React, { useRef, forwardRef } from 'react';
 import { PDFDocument, Tag } from '@/lib/types';
 import PDFCanvas from './PDFCanvas';
-import TagOverlay from './TagOverlay';
+import PDFTagList from './PDFTagList';
+import PDFSelectionBox from './PDFSelectionBox';
 import PDFTextDebug from './PDFTextDebug';
 import { InteractionMode } from '@/hooks/pdf/constants';
 import usePdfTextDebug from '@/hooks/usePdfTextDebug';
@@ -49,16 +50,6 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
     { toggleDebug, visualizeTextForCurrentPage }
   ] = usePdfTextDebug(document, currentPage, existingTags, selectedTagId);
   
-  const selectionStyle = {
-    left: `${Math.min(startPos.x, currentPos.x)}px`,
-    top: `${Math.min(startPos.y, currentPos.y)}px`,
-    width: `${Math.abs(currentPos.x - startPos.x)}px`,
-    height: `${Math.abs(currentPos.y - startPos.y)}px`,
-    display: isSelecting ? 'block' : 'none',
-    borderColor: selectionPurpose === 'zoom' ? 'rgba(50, 205, 50, 0.8)' : 'rgba(59, 130, 246, 0.8)',
-    backgroundColor: selectionPurpose === 'zoom' ? 'rgba(50, 205, 50, 0.2)' : 'rgba(59, 130, 246, 0.2)'
-  };
-
   // For text selection mode, we don't attach mouse events directly to the container
   // as text selection is now handled by the text layer
   const containerEvents = mode === 'select' ? {} : {
@@ -85,30 +76,22 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
       
       {/* Selection box overlay (only for non-text selection modes) */}
       {mode !== 'select' && (
-        <div
-          className="absolute border-2 pointer-events-none"
-          style={selectionStyle}
+        <PDFSelectionBox
+          isSelecting={isSelecting}
+          startPos={startPos}
+          currentPos={currentPos}
+          selectionPurpose={selectionPurpose}
         />
       )}
       
       {/* Render existing tags */}
-      {existingTags.map((tag) => {
-        if (!containerRefToUse.current) return null;
-        
-        // Calculate proper scale factor based on rendered PDF size vs container size
-        const scaleFactor = pdfDimensions.width / (containerRefToUse.current.clientWidth || 1);
-        const isSelected = selectedTagId === tag.id;
-        
-        return (
-          <TagOverlay
-            key={tag.id}
-            tag={tag}
-            scaleFactor={scaleFactor}
-            isSelected={isSelected}
-            mode={mode}
-          />
-        );
-      })}
+      <PDFTagList
+        tags={existingTags}
+        containerRef={containerRefToUse}
+        pdfDimensions={pdfDimensions}
+        selectedTagId={selectedTagId}
+        mode={mode}
+      />
       
       {/* Text debugging overlay */}
       <PDFTextDebug
