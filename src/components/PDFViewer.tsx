@@ -70,6 +70,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       window.document.removeEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
     };
   }, [zoomToRegion]);
+
   const handleContainerInteraction = (event: React.MouseEvent) => {
     if (!containerRef.current) return;
     
@@ -95,8 +96,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   }, [mode, onRegionSelected]);
 
   return (
-    <Card className="w-full mb-6 overflow-hidden">
-      <CardContent className="p-0 relative">
+    <div className="w-full h-full">
+      <div className="flex flex-col h-full">
         <PDFViewerHeader
           document={document}
           currentPage={currentPage}
@@ -108,9 +109,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           onResetZoom={handleResetZoom}
           onScaleChange={handleScaleChange}
         />
-          <div 
+        <div 
           ref={scrollContainerRef}
-          className="overflow-auto max-h-[70vh] relative"
+          className="flex-grow overflow-auto"
           style={{ touchAction: 'pan-x pan-y' }}
         >
           <PDFViewerContent
@@ -131,8 +132,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             onRegionSelected={handleRegionSelected}
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
