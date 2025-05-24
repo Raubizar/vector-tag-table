@@ -43,20 +43,41 @@ export const usePdfRendering = ({
     scale: number;
   } | null>(null);
   const [pageHash, setPageHash] = useState<string>('');
+  const renderTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Clear any pending render timeout on cleanup or dependency change
+    return () => {
+      if (renderTimeoutRef.current !== null) {
+        clearTimeout(renderTimeoutRef.current);
+        renderTimeoutRef.current = null;
+      }
+    };
+  }, [document, currentPage, scale]);
 
   useEffect(() => {
     const renderPdf = async () => {
       if (!containerRef.current || !document.data) return;
       
+      // Skip if we've already attempted this exact render
+      const currentRender = {
+        documentId: document.id,
+        page: currentPage,
+        scale
+      };
+      
+      if (lastRenderAttemptRef.current && 
+          lastRenderAttemptRef.current.documentId === currentRender.documentId &&
+          lastRenderAttemptRef.current.page === currentRender.page &&
+          Math.abs(lastRenderAttemptRef.current.scale - currentRender.scale) < 0.001) {
+        return;
+      }
+      
+      // Record this render attempt
+      lastRenderAttemptRef.current = currentRender;
+      
       try {
-        // Record this render attempt to avoid duplicate renders
-        lastRenderAttemptRef.current = {
-          documentId: document.id,
-          page: currentPage,
-          scale
-        };
-        
-        // Clear container before rendering
+        // Clear container before rendering to prevent flicker from old content
         while (containerRef.current.firstChild) {
           containerRef.current.removeChild(containerRef.current.firstChild);
         }
@@ -85,11 +106,6 @@ export const usePdfRendering = ({
         // Generate page hash for template identification
         const currentPageHash = `page_${currentPage}_${scale.toFixed(2)}`;
         setPageHash(currentPageHash);
-        
-        // Show loading message for large PDFs at high zoom
-        if (scale > 1.5) {
-          console.log("Rendering large PDF at high zoom level:", scale);
-        }
         
         // Render the PDF with text layer enabled for selection
         const renderResult = await renderPdfPage(
@@ -132,50 +148,36 @@ export const usePdfRendering = ({
       }
     };
 
-    // Add a small delay when zooming to prevent too many render calls
-    const renderTimer = setTimeout(() => {
-      renderPdf();
-    }, 100);
+    // Add a delay to prevent too many rapid renders causing flickering
+    if (renderTimeoutRef.current !== null) {
+      clearTimeout(renderTimeoutRef.current);
+    }
     
-    // Cleanup function
-    return () => {
-      clearTimeout(renderTimer);
-    };
+    renderTimeoutRef.current = window.setTimeout(() => {
+      renderPdf();
+      renderTimeoutRef.current = null;
+    }, 150); // Debounce renders
+    
   }, [document, currentPage, scale, onDimensionsChange, autoZoom, enableTextLayer, enableTextCapture]);
 
   // Helper function to handle auto-zoom
   const handleAutoZoom = (renderResult: {width: number, height: number}) => {
     // Wait a bit for the canvas to fully render
     setTimeout(() => {
-      const a4WidthMm = 210; // A4 width in mm
-      const a4HeightMm = 297; // A4 height in mm
-      
-      // Get the current PDF dimensions in pixels
-      const pdfWidthPx = renderResult.width;
-      const pdfHeightPx = renderResult.height;
-      
-      // Calculate A4 size in the current PDF's pixel scale
-      const pxPerMm = Math.min(pdfWidthPx / 841, pdfHeightPx / 1189); // A0 size is 841×1189 mm
-      const a4WidthPx = a4WidthMm * pxPerMm;
-      const a4HeightPx = a4HeightMm * pxPerMm;
-      
-      // Calculate the bottom right A4 area (with some padding)
-      const padding = 20; // pixels
-      const targetRegion = {
-        x: Math.max(0, pdfWidthPx - a4WidthPx - padding),
-        y: Math.max(0, pdfHeightPx - a4HeightPx - padding),
-        width: Math.min(a4WidthPx, pdfWidthPx),
-        height: Math.min(a4HeightPx, pdfHeightPx)
+      // Calculate the bottom right quarter of the document
+      const bottomRightQuadrant = {
+        x: renderResult.width / 2, // Start at middle of width
+        y: renderResult.height / 2, // Start at middle of height
+        width: renderResult.width / 2, // Half width
+        height: renderResult.height / 2 // Half height
       };
       
       // Dispatch a custom event to trigger zooming to this region
       const zoomEvent = new CustomEvent('auto-zoom-to-region', { 
-        detail: targetRegion
+        detail: bottomRightQuadrant
       });
       window.document.dispatchEvent(zoomEvent);
-      
-      toast.info("Auto-zoomed to A4 size area");
-    }, 500);
+    }, 300);
   };
 
   return {

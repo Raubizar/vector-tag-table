@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, memo } from 'react';
 import { PDFDocument } from '@/lib/types';
 import { usePdfRendering } from '@/hooks/usePdfRendering';
 import PDFSelectionHandler from './PDFSelectionHandler';
@@ -40,18 +40,35 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
     autoZoom
   });
   
-  // Apply our interaction fixes
+  // Apply our interaction fixes - with optimizations to prevent flickering
   useEffect(() => {
-    if (containerRef.current) {
+    let isMounted = true;
+    
+    // Add a debounce to prevent multiple rapid calls
+    const applyFixes = () => {
+      if (!isMounted || !containerRef.current) return;
       fixPdfViewerInteractions(containerRef.current);
-    }
-  }, [document, currentPage, scale]);
+    };
+    
+    // Delay slightly to ensure DOM is ready
+    const timeoutId = window.setTimeout(applyFixes, 50);
+    
+    // Clean up function
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [document.id, currentPage]); // Only re-run on document/page change, not scale
   
   return (
     <div
       ref={containerRef}
       className="relative w-full h-full pdf-canvas-container"
-      style={{ minHeight: "400px" }} // Increased from 200px to 400px
+      style={{ 
+        minHeight: "400px",
+        willChange: "transform", // Hardware acceleration hint
+        transform: "translateZ(0)" // Force GPU acceleration
+      }}
     >
       {/* PDF will be rendered here by the rendering hook */}
       
@@ -91,4 +108,5 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
   );
 };
 
-export default PDFCanvas;
+// Use memo to prevent unnecessary re-renders
+export default memo(PDFCanvas);

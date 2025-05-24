@@ -1,5 +1,5 @@
 
-import { useState, useCallback, RefObject } from 'react';
+import { useState, useCallback, RefObject, useRef } from 'react';
 
 export interface ZoomRegion {
   x: number;
@@ -18,6 +18,7 @@ export default function usePdfZoom({
   onZoomChange 
 }: UsePdfZoomProps) {
   const [scale, setScale] = useState(1);
+  const zoomTimeoutRef = useRef<number | null>(null);
   
   const handleZoomIn = useCallback(() => {
     const newScale = Math.min(3, scale + 0.1);
@@ -48,6 +49,12 @@ export default function usePdfZoom({
   const zoomToRegion = useCallback((region: ZoomRegion) => {
     if (!scrollContainerRef.current) return;
     
+    // Clear any existing timeout to prevent conflicts
+    if (zoomTimeoutRef.current) {
+      window.clearTimeout(zoomTimeoutRef.current);
+      zoomTimeoutRef.current = null;
+    }
+    
     // Calculate new scale to fit the region with padding
     const containerWidth = scrollContainerRef.current.clientWidth;
     const containerHeight = scrollContainerRef.current.clientHeight;
@@ -63,16 +70,21 @@ export default function usePdfZoom({
     onZoomChange?.(newScale);
     
     // After scale update, scroll to center the region
-    setTimeout(() => {
+    zoomTimeoutRef.current = window.setTimeout(() => {
       if (!scrollContainerRef.current) return;
       
       // Calculate the scroll position to center on the region
       const targetX = region.x * newScale - (containerWidth - region.width * newScale) / 2;
       const targetY = region.y * newScale - (containerHeight - region.height * newScale) / 2;
       
-      // Set scroll position
-      scrollContainerRef.current.scrollLeft = Math.max(0, targetX);
-      scrollContainerRef.current.scrollTop = Math.max(0, targetY);
+      // Set scroll position with smooth behavior
+      scrollContainerRef.current.scrollTo({
+        left: Math.max(0, targetX),
+        top: Math.max(0, targetY),
+        behavior: 'smooth'
+      });
+      
+      zoomTimeoutRef.current = null;
     }, 100);
   }, [scrollContainerRef, onZoomChange]);
   

@@ -1,5 +1,9 @@
+
 // This utility fixes PDF rendering and interaction issues
 import { toast } from 'sonner';
+
+// Track if fixes have been applied to prevent duplicates
+const appliedFixes = new Set<string>();
 
 /**
  * Fix PDF viewer interaction issues
@@ -7,6 +11,20 @@ import { toast } from 'sonner';
  */
 export function fixPdfViewerInteractions(containerElement: HTMLElement | null) {
   if (!containerElement) return;
+  
+  // Generate a unique ID for this container to prevent duplicate fixes
+  const containerId = containerElement.id || 
+    `pdf-container-${Math.random().toString(36).substring(2, 9)}`;
+  
+  // Set ID if not already set
+  if (!containerElement.id) {
+    containerElement.id = containerId;
+  }
+  
+  // If fixes already applied to this container, skip
+  if (appliedFixes.has(containerId)) {
+    return;
+  }
   
   // Make sure we don't have event duplication
   containerElement.removeEventListener('mousedown', preventBrowserSelectionOnPdf);
@@ -20,7 +38,8 @@ export function fixPdfViewerInteractions(containerElement: HTMLElement | null) {
   containerElement.removeEventListener('wheel', handleWheelEvent);
   containerElement.addEventListener('wheel', handleWheelEvent);
   
-  console.log('PDF viewer interactions fixed');
+  // Add this container to our tracking set
+  appliedFixes.add(containerId);
   
   // Add CSS fixes if needed
   addCssFixes();
@@ -58,7 +77,6 @@ function handleWheelEvent(event: WheelEvent) {
   // Only prevent default if Ctrl key is pressed (browser zoom)
   if (event.ctrlKey) {
     event.preventDefault();
-    // We could implement custom zoom here if needed
   }
 }
 
@@ -75,6 +93,8 @@ function addCssFixes() {
     /* Fix for pointer events */
     .pdf-canvas-container {
       touch-action: none; /* Disable browser handling of touch */
+      backface-visibility: hidden; /* Reduce flickering */
+      -webkit-backface-visibility: hidden; /* For Safari */
     }
     
     /* Fix for text selection */
@@ -86,6 +106,13 @@ function addCssFixes() {
     /* Fix for tag overlay interactions */
     .tag-overlay {
       pointer-events: all !important;
+    }
+    
+    /* Fix for flickering during scroll/zoom */
+    .pdf-canvas-container canvas {
+      transform: translateZ(0); /* Force GPU rendering */
+      backface-visibility: hidden; /* Reduce flickering */
+      -webkit-backface-visibility: hidden; /* For Safari */
     }
   `;
   

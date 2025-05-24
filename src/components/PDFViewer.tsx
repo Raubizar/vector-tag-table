@@ -27,6 +27,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const hasZoomedRef = useRef<boolean>(false);
   
   // Use our refactored zoom hook
   const {
@@ -63,6 +64,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     const handleAutoZoom = (e: CustomEvent) => {
       if (e.detail) {
         zoomToRegion(e.detail);
+        hasZoomedRef.current = true;
       }
     };
     
@@ -75,7 +77,17 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
 
   // Auto-zoom to bottom-right quadrant when document loads or changes
   useEffect(() => {
-    if (autoZoomToBottomRight && pdfDimensions.width > 0 && pdfDimensions.height > 0) {
+    // Reset the zoom state when document changes
+    if (document.id) {
+      hasZoomedRef.current = false;
+    }
+    
+    // Only zoom if dimensions are available and we haven't zoomed yet
+    if (autoZoomToBottomRight && 
+        pdfDimensions.width > 0 && 
+        pdfDimensions.height > 0 && 
+        !hasZoomedRef.current) {
+      
       // Calculate the bottom-right quadrant
       const bottomRightQuadrant = {
         x: pdfDimensions.width / 2,
@@ -84,10 +96,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         height: pdfDimensions.height / 2
       };
       
-      // Apply zoom with a small delay to ensure the PDF has rendered
-      setTimeout(() => {
+      // Apply zoom with a delay to ensure the PDF has rendered
+      const timeoutId = setTimeout(() => {
         zoomToRegion(bottomRightQuadrant);
+        hasZoomedRef.current = true;
       }, 500);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [document.id, pdfDimensions, autoZoomToBottomRight, zoomToRegion]);
 
