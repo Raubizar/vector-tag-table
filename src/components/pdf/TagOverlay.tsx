@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Tag } from '@/lib/types';
-import { InteractionMode } from '@/hooks/usePdfInteraction';
+import { InteractionMode } from '@/hooks/pdf/constants';
 
 interface TagOverlayProps {
   tag: Tag;

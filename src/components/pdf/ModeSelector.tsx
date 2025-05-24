@@ -2,7 +2,7 @@
 import React from 'react';
 import { PointerIcon, MoveIcon, ZoomInIcon } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { InteractionMode } from '@/hooks/usePdfInteraction';
+import { InteractionMode } from '@/hooks/pdf/constants';
 
 interface ModeSelectorProps {
   mode: InteractionMode;

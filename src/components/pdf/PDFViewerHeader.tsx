@@ -3,7 +3,7 @@ import React from 'react';
 import { PDFDocument } from '@/lib/types';
 import ModeSelector from './ModeSelector';
 import ZoomControls from './ZoomControls';
-import { InteractionMode } from '@/hooks/usePdfInteraction';
+import { InteractionMode } from '@/hooks/pdf/constants';
 
 interface PDFViewerHeaderProps {
   document: PDFDocument;
