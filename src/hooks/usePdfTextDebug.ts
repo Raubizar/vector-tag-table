@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { PDFDocument, Tag, TextExtractionDebugSettings } from '@/lib/types';
-import { visualizeTextElements } from '@/lib/pdf/textExtraction';
+import { visualizeTextElements } from '@/lib/pdf/textVisualization';
 
 export interface TextDebugState {
   isDebugActive: boolean;

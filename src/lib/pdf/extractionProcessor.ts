@@ -1,6 +1,5 @@
-
 import { PDFDocument, Tag, ExtractionResult, TextElement } from '../types';
-import { extractTextElementsFromPage } from './textExtraction';
+import { extractTextElementsFromPage } from './textElement';
 import { createPdfLoadingTask } from './core';
 import extractionLogger from './extractionLogger';
 import { cloneArrayBuffer, isArrayBufferDetached } from './safeBufferUtils';

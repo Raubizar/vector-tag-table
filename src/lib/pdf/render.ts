@@ -1,8 +1,8 @@
-
 import * as pdfjs from 'pdfjs-dist';
 import { createPdfLoadingTask } from './core';
 import { cloneArrayBuffer } from './safeBufferUtils';
-import { createTextLayer, setupTextSelectionCapture } from './textSelection';
+import { createTextLayer } from './textLayer';
+import { setupTextSelectionCapture } from './selectionCapture';
 
 // Enhanced rendering options for PDF pages
 export interface RenderOptions {
