@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { renderPdfPage } from '@/lib/pdf/render';
 import { PDFDocument } from '@/lib/types';
@@ -6,6 +5,7 @@ import { toast } from 'sonner';
 import { cloneArrayBuffer, isArrayBufferDetached } from '@/lib/pdf/safeBufferUtils';
 import { getTextSelectionRect, getSelectedText } from '@/lib/pdf/textSelection';
 import * as pdfjs from 'pdfjs-dist';
+import { setupTextSelectionCapture } from '@/lib/pdf/selectionCapture';
 
 interface PDFCanvasProps {
   document: PDFDocument;
@@ -132,6 +132,11 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
         // Store references to rendered elements
         if (renderResult.textLayer) {
           textLayerRef.current = renderResult.textLayer;
+          
+          // Setup text selection capture on the text layer
+          if (renderResult.viewport && renderResult.textLayer) {
+            setupTextSelectionCapture(renderResult.textLayer, renderResult.viewport);
+          }
         }
         
         if (renderResult.viewport) {

@@ -11,5 +11,6 @@ export * from './pdf/safeBufferUtils';
 export * from './pdf/extractionProcessor';
 export * from './pdf/documentAnalyzer';
 export * from './pdf/extractionUtils';
-export * from './pdf/textSelection';
-
+export * from './pdf/textLayer';       // Export new module
+export * from './pdf/textSelection';   // Export new module
+export * from './pdf/selectionCapture';// Export new module
