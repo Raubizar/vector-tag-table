@@ -3,6 +3,7 @@ import * as pdfjs from 'pdfjs-dist';
 import { TextElement } from '../types';
 import { createPdfLoadingTask } from './core';
 import { cloneArrayBuffer } from './safeBufferUtils';
+import type { TextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/api';
 
 /**
  * Creates a text layer div for text selection in PDFs
@@ -51,11 +52,15 @@ export const createTextLayer = async (
   const textDivs: HTMLSpanElement[] = [];
   
   for (let i = 0; i < textItems.length; i++) {
-    const textItem = textItems[i];
+    const item = textItems[i];
     
-    if (!textItem.str || textItem.str.trim() === '') {
+    // Type guard to check if this item is a TextItem (not TextMarkedContent)
+    if (!('str' in item) || !item.str || item.str.trim() === '') {
       continue;
     }
+    
+    // At this point TypeScript knows item is a TextItem with the str property
+    const textItem = item as TextItem;
     
     // Create text span
     const textSpan = document.createElement('span');
@@ -68,7 +73,7 @@ export const createTextLayer = async (
     // the position and scaling of each character
     const fontSize = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
     
-    if (textItem.dir) {
+    if ('dir' in textItem && textItem.dir) {
       textSpan.dir = textItem.dir;
     }
     
@@ -76,7 +81,7 @@ export const createTextLayer = async (
     textSpan.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, ${tx[4]}, ${tx[5]})`;
     textSpan.style.left = '0px';
     textSpan.style.top = '0px';
-    textSpan.style.fontFamily = textItem.fontName || 'sans-serif';
+    textSpan.style.fontFamily = 'fontName' in textItem ? textItem.fontName || 'sans-serif' : 'sans-serif';
     textSpan.style.fontSize = `${fontSize}px`;
     textSpan.style.position = 'absolute';
     
