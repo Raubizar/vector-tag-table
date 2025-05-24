@@ -60,6 +60,7 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
   };
 
   // For text selection mode, we don't attach mouse events directly to the container
+  // as text selection is now handled by the text layer
   const containerEvents = mode === 'select' ? {} : {
     onMouseDown: onContainerInteraction,
     onMouseMove: onContainerInteraction,
@@ -79,7 +80,7 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
         scale={scale}
         onDimensionsChange={onDimensionsChange}
         autoZoom={true}
-        onRegionSelected={mode === 'select' ? onRegionSelected : undefined}
+        onRegionSelected={onRegionSelected}
       />
       
       {/* Selection box overlay (only for non-text selection modes) */}

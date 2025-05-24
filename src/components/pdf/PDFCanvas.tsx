@@ -1,9 +1,10 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { renderPdfPage } from '@/lib/pdf/render';
 import { PDFDocument } from '@/lib/types';
 import { toast } from 'sonner';
 import { cloneArrayBuffer, isArrayBufferDetached } from '@/lib/pdf/safeBufferUtils';
-import { getTextSelectionRect } from '@/lib/pdf/textSelection';
+import { getTextSelectionRect, getSelectedText } from '@/lib/pdf/textSelection';
 import * as pdfjs from 'pdfjs-dist';
 
 interface PDFCanvasProps {
@@ -34,43 +35,41 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
     scale: number;
   } | null>(null);
 
-  // Setup text selection handler
+  // Setup box capture event handler
   useEffect(() => {
-    const handleTextSelection = (e: MouseEvent) => {
-      if (!textLayerRef.current || !viewportRef.current || !onRegionSelected || e.type !== 'mouseup') {
-        return;
-      }
+    const handleBoxCaptured = (e: CustomEvent) => {
+      const { label, boxNorm } = e.detail;
       
-      // Get selection rectangle
-      const selectionInfo = getTextSelectionRect(textLayerRef.current, viewportRef.current);
-      if (!selectionInfo) return;
-      
-      // Convert to region format expected by tag system
-      const { pdfCoords } = selectionInfo;
-      const region = {
-        x: pdfCoords.x1,
-        y: pdfCoords.y1,
-        width: pdfCoords.x2 - pdfCoords.x1,
-        height: pdfCoords.y2 - pdfCoords.y1
-      };
-      
-      // Only trigger selection if there's a meaningful area
-      if (region.width > 1 && region.height > 1) {
+      if (onRegionSelected && boxNorm) {
+        // Convert normalized coordinates back to PDF coordinates for the region
+        const x = boxNorm.x1 * (viewportRef.current?.width || 0);
+        const y = boxNorm.y1 * (viewportRef.current?.height || 0);
+        const width = (boxNorm.x2 - boxNorm.x1) * (viewportRef.current?.width || 0);
+        const height = (boxNorm.y2 - boxNorm.y1) * (viewportRef.current?.height || 0);
+        
+        // Create region object expected by the tag system
+        const region = { x, y, width, height, label };
+        
+        // Pass to parent component
         onRegionSelected(region);
+        
+        // Show toast notification
+        toast.success(`Selection captured: ${label}`);
+        
+        console.log('Normalized coordinates:', boxNorm);
       }
     };
     
-    // Add event listener to container
-    if (containerRef.current && onRegionSelected) {
-      containerRef.current.addEventListener('mouseup', handleTextSelection);
-    }
+    // Add event listener for boxCaptured events
+    window.addEventListener('boxCaptured', handleBoxCaptured as EventListener);
     
     return () => {
-      if (containerRef.current) {
-        containerRef.current.removeEventListener('mouseup', handleTextSelection);
-      }
+      window.removeEventListener('boxCaptured', handleBoxCaptured as EventListener);
     };
-  }, [onRegionSelected, isTextLayerEnabled]);
+  }, [onRegionSelected]);
+
+  // For text selection, we don't need the manual text selection handler anymore
+  // as this is now handled by setupTextSelectionCapture
 
   useEffect(() => {
     const renderPdf = async () => {
@@ -115,7 +114,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           console.log("Rendering large PDF at high zoom level:", scale);
         }
         
-        // Render the PDF with text layer enabled
+        // Render the PDF with text layer enabled for selection
         const renderResult = await renderPdfPage(
           containerRef.current,
           pdfData,
@@ -125,7 +124,8 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
             enableOptimizedRendering: true,
             enableProgressiveLoading: true,
             useHighQualityRendering: scale > 1.5,
-            enableTextLayer: isTextLayerEnabled // Enable text layer for selection
+            enableTextLayer: isTextLayerEnabled, // Enable text layer for selection
+            enableTextCapture: true // Enable the text selection capture functionality
           }
         );
         
@@ -216,6 +216,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           opacity: 0.2;
           cursor: text;
           user-select: text;
+          pointer-events: auto;
         }
         .pdf-text-layer ::selection {
           background: rgba(59, 130, 246, 0.3);

@@ -30,22 +30,15 @@ export const createTextLayer = async (
   textLayerDiv.style.lineHeight = '1.0';
   textLayerDiv.style.userSelect = 'text';
   textLayerDiv.style.cursor = 'text';
+  textLayerDiv.style.pointerEvents = 'auto'; // Allow user interaction
   
   container.appendChild(textLayerDiv);
 
   // Get text content from page
   const textContent = await page.getTextContent();
 
-  // Create text layer builder
-  const renderParameters = {
-    textContent,
-    container: textLayerDiv,
-    viewport,
-    textDivs: []
-  };
-
-  // Since TextLayerBuilder and EventBus aren't available as direct imports, 
-  // we'll use a more direct approach to render the text layer
+  // Create text layer builder - we're manually constructing it since
+  // PDF.js doesn't export TextLayerBuilder directly
   
   // We need to manually create and position text spans
   const textItems = textContent.items;
@@ -138,10 +131,10 @@ export const getTextSelectionRect = (
   
   // Get normalized coordinates (0-1) based on viewport dimensions
   const normalizedCoords = {
-    x1: x1 / viewport.width,
-    y1: y1 / viewport.height,
-    x2: x2 / viewport.width,
-    y2: y2 / viewport.height
+    x1: pdfPoint1[0] / viewport.width,
+    y1: pdfPoint1[1] / viewport.height,
+    x2: pdfPoint2[0] / viewport.width,
+    y2: pdfPoint2[1] / viewport.height
   };
   
   return {
@@ -166,3 +159,47 @@ export const getSelectedText = (): string => {
   const selection = window.getSelection();
   return selection ? selection.toString() : '';
 };
+
+/**
+ * Captures text selection and prompts for a label
+ * @param textLayerDiv Text layer div element 
+ * @param viewport PDF.js viewport object
+ * @returns Promise that resolves with label and normalized coordinates
+ */
+export const setupTextSelectionCapture = (
+  textLayerDiv: HTMLDivElement,
+  viewport: pdfjs.PageViewport
+): void => {
+  // Add mouseup event listener to capture selections
+  textLayerDiv.addEventListener('mouseup', () => {
+    // Get selection info
+    const selectionInfo = getTextSelectionRect(textLayerDiv, viewport);
+    if (!selectionInfo) return;
+    
+    // Clear the selection to remove highlighting
+    const selection = window.getSelection();
+    if (selection) selection.removeAllRanges();
+    
+    // Extract the normalized coordinates
+    const { normalizedCoords } = selectionInfo;
+    
+    // Only process meaningful selections (not tiny accidental clicks)
+    const width = Math.abs(normalizedCoords.x2 - normalizedCoords.x1);
+    const height = Math.abs(normalizedCoords.y2 - normalizedCoords.y1);
+    
+    if (width < 0.001 || height < 0.001) return;
+    
+    // Prompt for label (can be replaced with a more sophisticated UI)
+    const label = prompt('Enter header name for this value (e.g. DRAWING NUMBER)');
+    if (!label) return;
+    
+    // Dispatch event with the captured data
+    window.dispatchEvent(new CustomEvent('boxCaptured', {
+      detail: { 
+        label, 
+        boxNorm: normalizedCoords
+      }
+    }));
+  });
+};
+

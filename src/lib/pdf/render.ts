@@ -2,14 +2,15 @@
 import * as pdfjs from 'pdfjs-dist';
 import { createPdfLoadingTask } from './core';
 import { cloneArrayBuffer } from './safeBufferUtils';
-import { createTextLayer } from './textSelection';
+import { createTextLayer, setupTextSelectionCapture } from './textSelection';
 
 // Enhanced rendering options for PDF pages
 export interface RenderOptions {
   enableOptimizedRendering?: boolean;
   enableProgressiveLoading?: boolean;
   useHighQualityRendering?: boolean;
-  enableTextLayer?: boolean; // New option for text layer
+  enableTextLayer?: boolean; // Option for text layer
+  enableTextCapture?: boolean; // Option for text capture functionality
 }
 
 export const renderPdfPage = async (
@@ -106,6 +107,11 @@ export const renderPdfPage = async (
       let textLayer;
       if (options.enableTextLayer) {
         textLayer = await createTextLayer(wrapper, page, adjustedViewport);
+        
+        // Setup text selection capture if enabled
+        if (options.enableTextCapture && textLayer) {
+          setupTextSelectionCapture(textLayer, adjustedViewport);
+        }
       }
       
       return {
@@ -143,6 +149,11 @@ export const renderPdfPage = async (
       let textLayer;
       if (options.enableTextLayer) {
         textLayer = await createTextLayer(wrapper, page, viewport);
+        
+        // Setup text selection capture if enabled
+        if (options.enableTextCapture && textLayer) {
+          setupTextSelectionCapture(textLayer, viewport);
+        }
       }
       
       return {
