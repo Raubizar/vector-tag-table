@@ -13,6 +13,7 @@ interface PDFViewerProps {
   onRegionSelected: (region: Tag['region']) => void;
   existingTags?: Tag[];
   onTagUpdated?: (tagId: string, newRegion: Tag['region']) => void;
+  autoZoomToBottomRight?: boolean;
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({
@@ -20,7 +21,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   currentPage,
   onRegionSelected,
   existingTags = [],
-  onTagUpdated
+  onTagUpdated,
+  autoZoomToBottomRight = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
@@ -70,6 +72,25 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       window.document.removeEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
     };
   }, [zoomToRegion]);
+
+  // Auto-zoom to bottom-right quadrant when document loads or changes
+  useEffect(() => {
+    if (autoZoomToBottomRight && pdfDimensions.width > 0 && pdfDimensions.height > 0) {
+      // Calculate the bottom-right quadrant
+      const bottomRightQuadrant = {
+        x: pdfDimensions.width / 2,
+        y: pdfDimensions.height / 2,
+        width: pdfDimensions.width / 2,
+        height: pdfDimensions.height / 2
+      };
+      
+      // Apply zoom with a small delay to ensure the PDF has rendered
+      setTimeout(() => {
+        zoomToRegion(bottomRightQuadrant);
+      }, 500);
+    }
+  }, [document.id, pdfDimensions, autoZoomToBottomRight, zoomToRegion]);
+
   const handleContainerInteraction = (event: React.MouseEvent) => {
     if (!containerRef.current) return;
     
@@ -95,7 +116,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   }, [mode, onRegionSelected]);
 
   return (
-    <Card className="w-full mb-6 overflow-hidden">
+    <Card className="w-full mb-4 overflow-hidden">
       <CardContent className="p-0 relative">
         <PDFViewerHeader
           document={document}
@@ -110,7 +131,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         />
           <div 
           ref={scrollContainerRef}
-          className="overflow-auto max-h-[70vh] relative"
+          className="overflow-auto max-h-[85vh] relative"
           style={{ touchAction: 'pan-x pan-y' }}
         >
           <PDFViewerContent

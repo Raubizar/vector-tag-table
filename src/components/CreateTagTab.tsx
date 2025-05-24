@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import PDFViewer from '@/components/PDFViewer';
 import TagManager from '@/components/TagManager';
@@ -8,8 +8,16 @@ import ActionsPanel from '@/components/ActionsPanel';
 import { PDFDocument, Tag } from '@/lib/types';
 import extractionLogger from '@/lib/pdf/extractionLogger';
 import { toast } from '@/components/ui/sonner';
-import { extractTextFromAllDocuments } from '@/lib/pdf/batchExtraction';
-import { saveResults } from '@/lib/store';
+import { Button } from '@/components/ui/button';
+import { ChevronsUpDown } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 interface CreateTagTabProps {
   documents: PDFDocument[];
@@ -46,13 +54,14 @@ const CreateTagTab: React.FC<CreateTagTabProps> = ({
   onClearAll,
   onTagUpdated
 }) => {
+  const [showTagPanel, setShowTagPanel] = useState(true);
+
   const handleExtractText = async () => {
     if (documents.length === 0 || tags.length === 0) {
       toast.error('You need at least one document and one tag to extract text');
       return;
     }
 
-    // Use onExtractText prop instead of trying to manage state locally
     try {
       // Enable logging for this extraction
       extractionLogger.enable();
@@ -76,51 +85,73 @@ const CreateTagTab: React.FC<CreateTagTabProps> = ({
     }
   };
 
+  const toggleTagPanel = () => {
+    setShowTagPanel(!showTagPanel);
+  };
+
   return (
-    <div className="grid lg:grid-cols-2 gap-6">
-      <div>
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Document Preview</CardTitle>
-            <CardDescription>
-              Select a region on page 1 to create a new tag, or use the move/resize tools to adjust existing tags
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {currentDocument ? (
-              <div className="space-y-4">
-                <PDFViewer
-                  document={currentDocument}
-                  currentPage={1} // Always show page 1
-                  onRegionSelected={onRegionSelected}
-                  existingTags={tags}
-                  onTagUpdated={onTagUpdated}
-                />
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                No document selected
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        <DocumentSelector 
-          documents={documents}
-          currentDocument={currentDocument}
-          onSelectDocument={onSelectDocument}
-        />
-      </div>
+    <div className="space-y-4">
+      {/* Document Selector - Horizontal at the top */}
+      <DocumentSelector 
+        documents={documents}
+        currentDocument={currentDocument}
+        onSelectDocument={onSelectDocument}
+      />
       
-      <div>
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Tag Management</CardTitle>
-            <CardDescription>
-              Create and manage extraction tags
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      {/* Main Content */}
+      <div className="flex flex-col space-y-4">
+        {/* PDF Viewer - Expanded to full width */}
+        {currentDocument ? (
+          <PDFViewer
+            document={currentDocument}
+            currentPage={1} // Always show page 1
+            onRegionSelected={onRegionSelected}
+            existingTags={tags}
+            onTagUpdated={onTagUpdated}
+            autoZoomToBottomRight={true}
+          />
+        ) : (
+          <Card className="w-full">
+            <CardContent className="text-center py-12 text-gray-500">
+              No document selected
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tag Management - Now in a sheet that can be opened when needed */}
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium">Tags ({tags.length})</h3>
+          <div className="flex space-x-2">
+            {/* Actions buttons from ActionsPanel */}
+            <Button 
+              onClick={handleExtractText} 
+              disabled={documents.length === 0 || tags.length === 0 || isProcessing}
+              variant="default"
+            >
+              Extract Text
+            </Button>
+            
+            <Button 
+              onClick={onViewResults} 
+              disabled={results.length === 0}
+              variant="outline"
+            >
+              View Results
+            </Button>
+            
+            <Button 
+              onClick={onClearAll} 
+              variant="destructive"
+              size="sm"
+            >
+              Clear All
+            </Button>
+          </div>
+        </div>
+        
+        {/* Tag Management Section - Now collapsible */}
+        <Card>
+          <CardContent className="p-4">
             <TagManager
               tags={tags}
               currentTag={currentTag}
@@ -130,16 +161,6 @@ const CreateTagTab: React.FC<CreateTagTabProps> = ({
             />
           </CardContent>
         </Card>
-        
-        <ActionsPanel
-          onExtractText={handleExtractText}
-          onViewResults={onViewResults}
-          onClearAll={onClearAll}
-          isProcessing={isProcessing}
-          documentsLength={documents.length}
-          tagsLength={tags.length}
-          resultsLength={results.length}
-        />
       </div>
     </div>
   );

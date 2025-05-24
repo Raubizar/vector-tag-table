@@ -21,7 +21,8 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
   onDimensionsChange,
   autoZoom = true,
   onRegionSelected
-}) => {  const containerRef = useRef<HTMLDivElement>(null);
+}) => {  
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Use our PDF rendering hook
   const {
@@ -45,11 +46,12 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
       fixPdfViewerInteractions(containerRef.current);
     }
   }, [document, currentPage, scale]);
+  
   return (
     <div
       ref={containerRef}
       className="relative w-full h-full pdf-canvas-container"
-      style={{ minHeight: "200px" }}
+      style={{ minHeight: "400px" }} // Increased from 200px to 400px
     >
       {/* PDF will be rendered here by the rendering hook */}
       
