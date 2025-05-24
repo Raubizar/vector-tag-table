@@ -43,17 +43,48 @@ export const createTextLayer = async (
     textDivs: []
   };
 
-  // We use standard PDF.js rendering approach instead of the custom builder
-  const textLayer = new pdfjs.TextLayerBuilder({
-    textLayerDiv,
-    eventBus: new pdfjs.EventBus(),
-    pageIndex: page.pageNumber - 1,
-    viewport
-  });
+  // Since TextLayerBuilder and EventBus aren't available as direct imports, 
+  // we'll use a more direct approach to render the text layer
   
-  textLayer.setTextContent(textContent);
-  textLayer.render();
-
+  // We need to manually create and position text spans
+  const textItems = textContent.items;
+  const textDivs: HTMLSpanElement[] = [];
+  
+  for (let i = 0; i < textItems.length; i++) {
+    const textItem = textItems[i];
+    
+    if (!textItem.str || textItem.str.trim() === '') {
+      continue;
+    }
+    
+    // Create text span
+    const textSpan = document.createElement('span');
+    textSpan.textContent = textItem.str;
+    
+    // Position the span using the text item's transform
+    const tx = textItem.transform;
+    
+    // Apply transform - these values come from the PDF and define
+    // the position and scaling of each character
+    const fontSize = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
+    
+    if (textItem.dir) {
+      textSpan.dir = textItem.dir;
+    }
+    
+    // Set style with transform
+    textSpan.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, ${tx[4]}, ${tx[5]})`;
+    textSpan.style.left = '0px';
+    textSpan.style.top = '0px';
+    textSpan.style.fontFamily = textItem.fontName || 'sans-serif';
+    textSpan.style.fontSize = `${fontSize}px`;
+    textSpan.style.position = 'absolute';
+    
+    // Add to container
+    textLayerDiv.appendChild(textSpan);
+    textDivs.push(textSpan);
+  }
+  
   return textLayerDiv;
 };
 
@@ -130,4 +161,3 @@ export const getSelectedText = (): string => {
   const selection = window.getSelection();
   return selection ? selection.toString() : '';
 };
-
