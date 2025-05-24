@@ -55,8 +55,10 @@ export function usePdfMouseHandlers({
   resetSelection,
   resetTagSelection
 }: UsePdfMouseHandlersProps) {
-  
-  const handleMouseDown = useCallback((e: React.MouseEvent, containerRect: DOMRect) => {
+    const handleMouseDown = useCallback((e: React.MouseEvent, containerRect: DOMRect) => {
+    // Prevent default to avoid browser's default behaviors
+    e.preventDefault();
+    
     const x = e.clientX - containerRect.left;
     const y = e.clientY - containerRect.top;
 
@@ -113,8 +115,9 @@ export function usePdfMouseHandlers({
     setMoveOffset, 
     setResizeHandle
   ]);
-
   const handleMouseMove = useCallback((e: React.MouseEvent, containerRect: DOMRect) => {
+    e.preventDefault(); // Prevent default browser behaviors
+    
     if (!isSelecting) return;
 
     const x = Math.max(0, Math.min(e.clientX - containerRect.left, containerRect.width));

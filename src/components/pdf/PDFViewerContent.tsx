@@ -43,16 +43,15 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
 }, ref) => {
   const innerRef = useRef<HTMLDivElement>(null);
   const containerRefToUse = (ref || innerRef) as React.RefObject<HTMLDivElement>;
-  
-  // Use our text debug hook
+    // Use our text debug hook
   const [
     { isDebugActive, debugSettings },
     { toggleDebug, visualizeTextForCurrentPage }
   ] = usePdfTextDebug(document, currentPage, existingTags, selectedTagId);
   
-  // For text selection mode, we don't attach mouse events directly to the container
-  // as text selection is now handled by the text layer
-  const containerEvents = mode === 'select' ? {} : {
+  // Always attach mouse events to the container regardless of mode
+  // This ensures we always capture user interactions
+  const containerEvents = {
     onMouseDown: onContainerInteraction,
     onMouseMove: onContainerInteraction,
     onMouseUp: onContainerInteraction,

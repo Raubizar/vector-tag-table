@@ -9,10 +9,12 @@ interface ModeSelectorProps {
   onModeChange: (mode: InteractionMode) => void;
 }
 
-const ModeSelector: React.FC<ModeSelectorProps> = ({ mode, onModeChange }) => {
-  return (
+const ModeSelector: React.FC<ModeSelectorProps> = ({ mode, onModeChange }) => {  return (
     <ToggleGroup type="single" value={mode} onValueChange={(value) => {
-      if (value) onModeChange(value as InteractionMode);
+      if (value) {
+        onModeChange(value as InteractionMode);
+        console.log('Mode changed to:', value);
+      }
     }}>
       <ToggleGroupItem value="select" aria-label="Select mode" title="Select area">
         <PointerIcon className="h-4 w-4" />

@@ -13,8 +13,7 @@ const PDFSelectionHandler: React.FC<PDFSelectionHandlerProps> = ({
   viewportRef,
   onRegionSelected,
   pageHash
-}) => {
-  // Setup box capture event handler
+}) => {  // Setup box capture event handler
   useEffect(() => {
     const handleBoxCaptured = (e: CustomEvent) => {
       const { label, boxNorm, pageHash: capturedPageHash } = e.detail;
@@ -33,9 +32,9 @@ const PDFSelectionHandler: React.FC<PDFSelectionHandlerProps> = ({
         onRegionSelected(region);
         
         // Show toast notification
-        toast.success(`Selection captured: ${label}`);
+        toast.success(`Selection captured`);
         
-        console.log('Normalized coordinates:', boxNorm);
+        console.log('Selection captured with coordinates:', boxNorm);
       }
     };
     

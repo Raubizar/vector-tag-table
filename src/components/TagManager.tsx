@@ -22,11 +22,19 @@ const TagManager: React.FC<TagManagerProps> = ({
 }) => {
   const [tagName, setTagName] = useState('');
   const [tagColor, setTagColor] = useState('#1E88E5');
-
   const handleSaveTag = () => {
-    if (!tagName.trim()) return;
-    if (!currentTag?.region) return;
+    if (!tagName.trim()) {
+      console.warn('Tag name is required');
+      return;
+    }
+    
+    if (!currentTag?.region) {
+      console.warn('No region selected. Please select an area in the document first.');
+      return;
+    }
 
+    console.log('Saving tag:', { name: tagName, color: tagColor, region: currentTag.region });
+    
     onSaveTag({
       name: tagName,
       color: tagColor,
