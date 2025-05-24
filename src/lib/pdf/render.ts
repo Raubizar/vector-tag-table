@@ -2,12 +2,14 @@
 import * as pdfjs from 'pdfjs-dist';
 import { createPdfLoadingTask } from './core';
 import { cloneArrayBuffer } from './safeBufferUtils';
+import { createTextLayer } from './textSelection';
 
 // Enhanced rendering options for PDF pages
 export interface RenderOptions {
   enableOptimizedRendering?: boolean;
   enableProgressiveLoading?: boolean;
   useHighQualityRendering?: boolean;
+  enableTextLayer?: boolean; // New option for text layer
 }
 
 export const renderPdfPage = async (
@@ -16,7 +18,13 @@ export const renderPdfPage = async (
   pageNumber = 1,
   scale = 1.0,
   options: RenderOptions = {}
-): Promise<{ width: number; height: number }> => {
+): Promise<{ 
+  width: number; 
+  height: number;
+  page?: pdfjs.PDFPageProxy;
+  viewport?: pdfjs.PageViewport;
+  textLayer?: HTMLDivElement;
+}> => {
   // Clear container
   container.innerHTML = '';
   
@@ -68,6 +76,14 @@ export const renderPdfPage = async (
       canvas.style.width = '100%';
       canvas.style.height = 'auto';
       
+      // Create wrapper div for positioning both canvas and text layer
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.width = '100%';
+      wrapper.style.height = 'auto';
+      wrapper.appendChild(canvas);
+      container.appendChild(wrapper);
+      
       // Render PDF page to canvas with optimized rendering
       const renderContext = {
         canvasContext: context,
@@ -86,11 +102,18 @@ export const renderPdfPage = async (
         await page.render(renderContext).promise;
       }
       
-      container.appendChild(canvas);
+      // Create text layer if enabled
+      let textLayer;
+      if (options.enableTextLayer) {
+        textLayer = await createTextLayer(wrapper, page, adjustedViewport);
+      }
       
       return {
         width: viewport.width, // Return original dimensions for proper scaling
-        height: viewport.height
+        height: viewport.height,
+        page,
+        viewport,
+        textLayer
       };
     } else {
       // Standard rendering for normal sized PDFs
@@ -98,6 +121,14 @@ export const renderPdfPage = async (
       canvas.width = viewport.width;
       canvas.style.width = '100%';
       canvas.style.height = 'auto';
+      
+      // Create wrapper div for positioning both canvas and text layer
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.width = '100%';
+      wrapper.style.height = 'auto';
+      wrapper.appendChild(canvas);
+      container.appendChild(wrapper);
       
       // Render PDF page to canvas
       const renderContext = {
@@ -108,11 +139,18 @@ export const renderPdfPage = async (
       
       await page.render(renderContext).promise;
       
-      container.appendChild(canvas);
+      // Create text layer if enabled
+      let textLayer;
+      if (options.enableTextLayer) {
+        textLayer = await createTextLayer(wrapper, page, viewport);
+      }
       
       return {
         width: viewport.width,
-        height: viewport.height
+        height: viewport.height,
+        page,
+        viewport,
+        textLayer
       };
     }
   } catch (error) {

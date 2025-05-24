@@ -21,6 +21,7 @@ interface PDFViewerContentProps {
   existingTags: Tag[];
   onDimensionsChange: (dimensions: { width: number; height: number }) => void;
   onContainerInteraction: (event: React.MouseEvent) => void;
+  onRegionSelected?: (region: Tag['region']) => void;
 }
 
 const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
@@ -36,12 +37,13 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
   selectedTagId,
   existingTags,
   onDimensionsChange,
-  onContainerInteraction
+  onContainerInteraction,
+  onRegionSelected
 }, ref) => {
   const innerRef = useRef<HTMLDivElement>(null);
   const containerRefToUse = (ref || innerRef) as React.RefObject<HTMLDivElement>;
   
-  // Use our new text debug hook
+  // Use our text debug hook
   const [
     { isDebugActive, debugSettings },
     { toggleDebug, visualizeTextForCurrentPage }
@@ -57,14 +59,19 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
     backgroundColor: selectionPurpose === 'zoom' ? 'rgba(50, 205, 50, 0.2)' : 'rgba(59, 130, 246, 0.2)'
   };
 
+  // For text selection mode, we don't attach mouse events directly to the container
+  const containerEvents = mode === 'select' ? {} : {
+    onMouseDown: onContainerInteraction,
+    onMouseMove: onContainerInteraction,
+    onMouseUp: onContainerInteraction,
+    onMouseLeave: onContainerInteraction
+  };
+
   return (
     <div
       ref={containerRefToUse}
       className="relative"
-      onMouseDown={onContainerInteraction}
-      onMouseMove={onContainerInteraction}
-      onMouseUp={onContainerInteraction}
-      onMouseLeave={onContainerInteraction}
+      {...containerEvents}
     >
       <PDFCanvas 
         document={document}
@@ -72,13 +79,16 @@ const PDFViewerContent = forwardRef<HTMLDivElement, PDFViewerContentProps>(({
         scale={scale}
         onDimensionsChange={onDimensionsChange}
         autoZoom={true}
+        onRegionSelected={mode === 'select' ? onRegionSelected : undefined}
       />
       
-      {/* Selection box overlay */}
-      <div
-        className="absolute border-2 pointer-events-none"
-        style={selectionStyle}
-      />
+      {/* Selection box overlay (only for non-text selection modes) */}
+      {mode !== 'select' && (
+        <div
+          className="absolute border-2 pointer-events-none"
+          style={selectionStyle}
+        />
+      )}
       
       {/* Render existing tags */}
       {existingTags.map((tag) => {

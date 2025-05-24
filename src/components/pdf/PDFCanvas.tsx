@@ -1,9 +1,10 @@
-
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { renderPdfPage } from '@/lib/pdf/render';
 import { PDFDocument } from '@/lib/types';
 import { toast } from 'sonner';
 import { cloneArrayBuffer, isArrayBufferDetached } from '@/lib/pdf/safeBufferUtils';
+import { getTextSelectionRect } from '@/lib/pdf/textSelection';
+import * as pdfjs from 'pdfjs-dist';
 
 interface PDFCanvasProps {
   document: PDFDocument;
@@ -11,6 +12,7 @@ interface PDFCanvasProps {
   scale: number;
   onDimensionsChange: (dimensions: { width: number; height: number }) => void;
   autoZoom?: boolean;
+  onRegionSelected?: (region: any) => void;
 }
 
 const PDFCanvas: React.FC<PDFCanvasProps> = ({
@@ -18,15 +20,57 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
   currentPage,
   scale,
   onDimensionsChange,
-  autoZoom = true
+  autoZoom = true,
+  onRegionSelected
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const textLayerRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<pdfjs.PageViewport | null>(null);
+  const [isTextLayerEnabled] = useState<boolean>(true);
   const lastRenderAttemptRef = useRef<{
     documentId: string;
     page: number;
     scale: number;
   } | null>(null);
+
+  // Setup text selection handler
+  useEffect(() => {
+    const handleTextSelection = (e: MouseEvent) => {
+      if (!textLayerRef.current || !viewportRef.current || !onRegionSelected || e.type !== 'mouseup') {
+        return;
+      }
+      
+      // Get selection rectangle
+      const selectionInfo = getTextSelectionRect(textLayerRef.current, viewportRef.current);
+      if (!selectionInfo) return;
+      
+      // Convert to region format expected by tag system
+      const { pdfCoords } = selectionInfo;
+      const region = {
+        x: pdfCoords.x1,
+        y: pdfCoords.y1,
+        width: pdfCoords.x2 - pdfCoords.x1,
+        height: pdfCoords.y2 - pdfCoords.y1
+      };
+      
+      // Only trigger selection if there's a meaningful area
+      if (region.width > 1 && region.height > 1) {
+        onRegionSelected(region);
+      }
+    };
+    
+    // Add event listener to container
+    if (containerRef.current && onRegionSelected) {
+      containerRef.current.addEventListener('mouseup', handleTextSelection);
+    }
+    
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.removeEventListener('mouseup', handleTextSelection);
+      }
+    };
+  }, [onRegionSelected, isTextLayerEnabled]);
 
   useEffect(() => {
     const renderPdf = async () => {
@@ -41,15 +85,12 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
         };
         
         // Clear container before rendering
-        if (canvasRef.current && containerRef.current.contains(canvasRef.current)) {
-          containerRef.current.removeChild(canvasRef.current);
-          canvasRef.current = null;
+        while (containerRef.current.firstChild) {
+          containerRef.current.removeChild(containerRef.current.firstChild);
         }
         
-        // Create new canvas using DOM methods
-        const canvas = window.document.createElement('canvas');
-        canvasRef.current = canvas;
-        containerRef.current.appendChild(canvas);
+        canvasRef.current = null;
+        textLayerRef.current = null;
         
         // Create a safe copy of the ArrayBuffer to prevent detachment
         let pdfData: ArrayBuffer;
@@ -59,7 +100,6 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           if (isArrayBufferDetached(document.data)) {
             console.warn("Document data was already detached, this might cause issues");
             toast.error("Document buffer was detached. Try reloading the document.");
-            // Still try to clone, which will fail if the buffer is properly detached
           }
           
           // Always create a fresh copy for each render operation
@@ -75,8 +115,8 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           console.log("Rendering large PDF at high zoom level:", scale);
         }
         
-        // Render the PDF with optimized parameters for large format documents
-        const dimensions = await renderPdfPage(
+        // Render the PDF with text layer enabled
+        const renderResult = await renderPdfPage(
           containerRef.current,
           pdfData,
           currentPage,
@@ -84,23 +124,37 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           {
             enableOptimizedRendering: true,
             enableProgressiveLoading: true,
-            useHighQualityRendering: scale > 1.5
+            useHighQualityRendering: scale > 1.5,
+            enableTextLayer: isTextLayerEnabled // Enable text layer for selection
           }
         );
         
-        onDimensionsChange(dimensions);
+        // Store references to rendered elements
+        if (renderResult.textLayer) {
+          textLayerRef.current = renderResult.textLayer;
+        }
+        
+        if (renderResult.viewport) {
+          viewportRef.current = renderResult.viewport;
+        }
+        
+        // Update dimensions for parent components
+        onDimensionsChange({
+          width: renderResult.width,
+          height: renderResult.height
+        });
         
         // If autoZoom is enabled and this is the first render (scale == 1),
         // automatically zoom to the bottom right A4 area
-        if (autoZoom && scale === 1 && dimensions.width > 1000) {
+        if (autoZoom && scale === 1 && renderResult.width > 1000) {
           // Wait a bit for the canvas to fully render
           setTimeout(() => {
             const a4WidthMm = 210; // A4 width in mm
             const a4HeightMm = 297; // A4 height in mm
             
             // Get the current PDF dimensions in pixels
-            const pdfWidthPx = dimensions.width;
-            const pdfHeightPx = dimensions.height;
+            const pdfWidthPx = renderResult.width;
+            const pdfHeightPx = renderResult.height;
             
             // Calculate A4 size in the current PDF's pixel scale
             const pxPerMm = Math.min(pdfWidthPx / 841, pdfHeightPx / 1189); // A0 size is 841×1189 mm
@@ -139,16 +193,8 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
     // Cleanup function
     return () => {
       clearTimeout(renderTimer);
-      if (canvasRef.current && containerRef.current && containerRef.current.contains(canvasRef.current)) {
-        try {
-          containerRef.current.removeChild(canvasRef.current);
-          canvasRef.current = null;
-        } catch (e) {
-          console.error('Error during cleanup:', e);
-        }
-      }
     };
-  }, [document, currentPage, scale, onDimensionsChange, autoZoom]);
+  }, [document, currentPage, scale, onDimensionsChange, autoZoom, isTextLayerEnabled]);
 
   return (
     <div
@@ -157,6 +203,30 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
       style={{ minHeight: "200px" }}
     >
       {/* PDF will be rendered here by the useEffect */}
+      {/* Text layer will also be rendered here */}
+      <style>{`
+        .pdf-text-layer {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          overflow: hidden;
+          line-height: 1.0;
+          opacity: 0.2;
+          cursor: text;
+          user-select: text;
+        }
+        .pdf-text-layer ::selection {
+          background: rgba(59, 130, 246, 0.3);
+        }
+        .pdf-text-layer span {
+          position: absolute;
+          white-space: pre;
+          cursor: text;
+          transform-origin: 0% 0%;
+        }
+      `}</style>
     </div>
   );
 };

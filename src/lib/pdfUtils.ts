@@ -11,3 +11,5 @@ export * from './pdf/safeBufferUtils';
 export * from './pdf/extractionProcessor';
 export * from './pdf/documentAnalyzer';
 export * from './pdf/extractionUtils';
+export * from './pdf/textSelection';
+

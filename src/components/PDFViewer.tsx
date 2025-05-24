@@ -84,6 +84,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     }
   };
 
+  // For text selection mode, we handle region selection directly from the canvas component
+  const handleRegionSelected = useCallback((region: Tag['region']) => {
+    if (mode === 'select') {
+      onRegionSelected(region);
+    }
+  }, [mode, onRegionSelected]);
+
   return (
     <Card className="w-full mb-6 overflow-hidden">
       <CardContent className="p-0 relative">
@@ -118,6 +125,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             existingTags={existingTags}
             onDimensionsChange={setPdfDimensions}
             onContainerInteraction={handleContainerInteraction}
+            onRegionSelected={handleRegionSelected}
           />
         </div>
       </CardContent>
