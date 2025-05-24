@@ -17,7 +17,7 @@ export const getTextSelectionRect = (
   // Get the current selection
   const selection = window.getSelection();
   
-  if (!selection || selection.rangeCount === 0) {
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
     return null;
   }
   

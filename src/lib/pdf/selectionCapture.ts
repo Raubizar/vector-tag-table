@@ -6,10 +6,12 @@ import { getTextSelectionRect } from './textSelection';
  * Captures text selection and prompts for a label
  * @param textLayerDiv Text layer div element 
  * @param viewport PDF.js viewport object
+ * @param pageHash Optional page hash for template identification
  */
 export const setupTextSelectionCapture = (
   textLayerDiv: HTMLDivElement,
-  viewport: pdfjs.PageViewport
+  viewport: pdfjs.PageViewport,
+  pageHash?: string
 ): void => {
   // Add mouseup event listener to capture selections
   textLayerDiv.addEventListener('mouseup', () => {
@@ -34,10 +36,14 @@ export const setupTextSelectionCapture = (
     const label = prompt('Enter header name for this value (e.g. DRAWING NUMBER)');
     if (!label) return;
     
+    // Generate page hash if not provided
+    const finalPageHash = pageHash || `${viewport.width}x${viewport.height}`;
+    
     // Dispatch event with the captured data
     window.dispatchEvent(new CustomEvent('boxCaptured', {
       detail: { 
         label, 
+        pageHash: finalPageHash,
         boxNorm: normalizedCoords
       }
     }));

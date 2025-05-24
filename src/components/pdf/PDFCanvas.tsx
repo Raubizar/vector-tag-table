@@ -3,9 +3,7 @@ import { renderPdfPage } from '@/lib/pdf/render';
 import { PDFDocument } from '@/lib/types';
 import { toast } from 'sonner';
 import { cloneArrayBuffer, isArrayBufferDetached } from '@/lib/pdf/safeBufferUtils';
-import { getTextSelectionRect, getSelectedText } from '@/lib/pdf/textSelection';
 import * as pdfjs from 'pdfjs-dist';
-import { setupTextSelectionCapture } from '@/lib/pdf/selectionCapture';
 
 interface PDFCanvasProps {
   document: PDFDocument;
@@ -38,7 +36,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
   // Setup box capture event handler
   useEffect(() => {
     const handleBoxCaptured = (e: CustomEvent) => {
-      const { label, boxNorm } = e.detail;
+      const { label, boxNorm, pageHash } = e.detail;
       
       if (onRegionSelected && boxNorm) {
         // Convert normalized coordinates back to PDF coordinates for the region
@@ -48,7 +46,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
         const height = (boxNorm.y2 - boxNorm.y1) * (viewportRef.current?.height || 0);
         
         // Create region object expected by the tag system
-        const region = { x, y, width, height, label };
+        const region = { x, y, width, height, label, pageHash };
         
         // Pass to parent component
         onRegionSelected(region);
@@ -67,9 +65,6 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
       window.removeEventListener('boxCaptured', handleBoxCaptured as EventListener);
     };
   }, [onRegionSelected]);
-
-  // For text selection, we don't need the manual text selection handler anymore
-  // as this is now handled by setupTextSelectionCapture
 
   useEffect(() => {
     const renderPdf = async () => {
@@ -109,6 +104,10 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           return;
         }
         
+        // Generate page hash for template identification
+        // This creates a unique identifier based on page dimensions
+        const pageHash = `page_${currentPage}_${scale.toFixed(2)}`;
+        
         // Show loading message for large PDFs at high zoom
         if (scale > 1.5) {
           console.log("Rendering large PDF at high zoom level:", scale);
@@ -125,18 +124,14 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
             enableProgressiveLoading: true,
             useHighQualityRendering: scale > 1.5,
             enableTextLayer: isTextLayerEnabled, // Enable text layer for selection
-            enableTextCapture: true // Enable the text selection capture functionality
+            enableTextCapture: true, // Enable the text selection capture functionality
+            pageHash: pageHash // Pass page hash for template identification
           }
         );
         
         // Store references to rendered elements
         if (renderResult.textLayer) {
           textLayerRef.current = renderResult.textLayer;
-          
-          // Setup text selection capture on the text layer
-          if (renderResult.viewport && renderResult.textLayer) {
-            setupTextSelectionCapture(renderResult.textLayer, renderResult.viewport);
-          }
         }
         
         if (renderResult.viewport) {

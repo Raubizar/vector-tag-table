@@ -16,7 +16,7 @@ export const createTextLayer = async (
 ): Promise<HTMLDivElement> => {
   // Create text layer div
   const textLayerDiv = document.createElement('div');
-  textLayerDiv.className = 'pdf-text-layer';
+  textLayerDiv.className = 'pdf-text-layer absolute inset-0';
   textLayerDiv.style.position = 'absolute';
   textLayerDiv.style.left = '0';
   textLayerDiv.style.top = '0';

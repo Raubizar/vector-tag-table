@@ -11,6 +11,7 @@ export interface RenderOptions {
   useHighQualityRendering?: boolean;
   enableTextLayer?: boolean; // Option for text layer
   enableTextCapture?: boolean; // Option for text capture functionality
+  pageHash?: string; // Optional page hash for template identification
 }
 
 export const renderPdfPage = async (
@@ -110,7 +111,7 @@ export const renderPdfPage = async (
         
         // Setup text selection capture if enabled
         if (options.enableTextCapture && textLayer) {
-          setupTextSelectionCapture(textLayer, adjustedViewport);
+          setupTextSelectionCapture(textLayer, adjustedViewport, options.pageHash);
         }
       }
       
