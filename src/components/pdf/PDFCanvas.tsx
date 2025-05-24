@@ -40,25 +40,21 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
     autoZoom
   });
   
-  // Apply our interaction fixes - with optimizations to prevent flickering
+  // Apply interaction fixes only when document or page changes to prevent flickering
   useEffect(() => {
-    let isMounted = true;
+    if (!containerRef.current) return;
     
-    // Add a debounce to prevent multiple rapid calls
-    const applyFixes = () => {
-      if (!isMounted || !containerRef.current) return;
-      fixPdfViewerInteractions(containerRef.current);
-    };
+    console.log('Applying PDF interaction fixes');
     
-    // Delay slightly to ensure DOM is ready
-    const timeoutId = window.setTimeout(applyFixes, 50);
+    // Small delay to ensure DOM is ready, but not too long to avoid flickering
+    const timeoutId = window.setTimeout(() => {
+      if (containerRef.current) {
+        fixPdfViewerInteractions(containerRef.current);
+      }
+    }, 50);
     
-    // Clean up function
-    return () => {
-      isMounted = false;
-      window.clearTimeout(timeoutId);
-    };
-  }, [document.id, currentPage]); // Only re-run on document/page change, not scale
+    return () => window.clearTimeout(timeoutId);
+  }, [document.id, currentPage]); // Only re-run on document/page change
   
   return (
     <div
@@ -66,8 +62,8 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
       className="relative w-full h-full pdf-canvas-container"
       style={{ 
         minHeight: "400px",
-        willChange: "transform", // Hardware acceleration hint
-        transform: "translateZ(0)" // Force GPU acceleration
+        willChange: "transform",
+        backfaceVisibility: "hidden" // Reduce flickering
       }}
     >
       {/* PDF will be rendered here by the rendering hook */}
@@ -108,5 +104,13 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
   );
 };
 
-// Use memo to prevent unnecessary re-renders
-export default memo(PDFCanvas);
+// Use memo with custom comparison to prevent unnecessary re-renders
+export default memo(PDFCanvas, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  return (
+    prevProps.document.id === nextProps.document.id &&
+    prevProps.currentPage === nextProps.currentPage &&
+    Math.abs(prevProps.scale - nextProps.scale) < 0.01 &&
+    prevProps.autoZoom === nextProps.autoZoom
+  );
+});

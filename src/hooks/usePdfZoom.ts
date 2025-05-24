@@ -47,7 +47,12 @@ export default function usePdfZoom({
   }, [onZoomChange]);
   
   const zoomToRegion = useCallback((region: ZoomRegion) => {
-    if (!scrollContainerRef.current) return;
+    if (!scrollContainerRef.current) {
+      console.log('No scroll container ref available for zoom');
+      return;
+    }
+    
+    console.log('Zooming to region:', region);
     
     // Clear any existing timeout to prevent conflicts
     if (zoomTimeoutRef.current) {
@@ -59,13 +64,17 @@ export default function usePdfZoom({
     const containerWidth = scrollContainerRef.current.clientWidth;
     const containerHeight = scrollContainerRef.current.clientHeight;
     
+    console.log('Container dimensions:', { containerWidth, containerHeight });
+    
     // Calculate the scale needed to fit the selection in the viewport (with padding)
-    const padding = 20; // pixels of padding around the selection
+    const padding = 40; // Increased padding for better visibility
     const scaleX = (containerWidth - 2 * padding) / region.width;
     const scaleY = (containerHeight - 2 * padding) / region.height;
-    const newScale = Math.min(Math.min(scaleX, scaleY), 3); // Cap at 3x zoom
+    const newScale = Math.min(Math.min(scaleX, scaleY), 2.5); // Reduced max scale for better performance
     
-    // Set the new scale
+    console.log('Calculated zoom scale:', newScale);
+    
+    // Set the new scale immediately
     setScale(newScale);
     onZoomChange?.(newScale);
     
@@ -77,6 +86,8 @@ export default function usePdfZoom({
       const targetX = region.x * newScale - (containerWidth - region.width * newScale) / 2;
       const targetY = region.y * newScale - (containerHeight - region.height * newScale) / 2;
       
+      console.log('Scrolling to position:', { targetX, targetY });
+      
       // Set scroll position with smooth behavior
       scrollContainerRef.current.scrollTo({
         left: Math.max(0, targetX),
@@ -85,7 +96,7 @@ export default function usePdfZoom({
       });
       
       zoomTimeoutRef.current = null;
-    }, 100);
+    }, 150); // Reduced timeout for faster response
   }, [scrollContainerRef, onZoomChange]);
   
   return {

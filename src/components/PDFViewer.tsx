@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { PDFDocument, Tag } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,7 +26,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const hasZoomedRef = useRef<boolean>(false);
+  const hasAutoZoomedRef = useRef<Map<string, boolean>>(new Map());
   
   // Use our refactored zoom hook
   const {
@@ -59,12 +58,14 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     onZoomToRegion: zoomToRegion
   });
   
-  // Listen for auto-zoom events
+  // Listen for auto-zoom events with improved event handling
   useEffect(() => {
     const handleAutoZoom = (e: CustomEvent) => {
       if (e.detail) {
+        console.log('Received auto-zoom event:', e.detail);
         zoomToRegion(e.detail);
-        hasZoomedRef.current = true;
+        // Mark this document as having been auto-zoomed
+        hasAutoZoomedRef.current.set(document.id, true);
       }
     };
     
@@ -73,20 +74,25 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     return () => {
       window.document.removeEventListener('auto-zoom-to-region', handleAutoZoom as EventListener);
     };
-  }, [zoomToRegion]);
+  }, [zoomToRegion, document.id]);
 
-  // Auto-zoom to bottom-right quadrant when document loads or changes
+  // Reset auto-zoom state when document changes
   useEffect(() => {
-    // Reset the zoom state when document changes
-    if (document.id) {
-      hasZoomedRef.current = false;
+    console.log('Document changed, resetting auto-zoom state:', document.id);
+    // Clear the auto-zoom flag for new documents
+    if (!hasAutoZoomedRef.current.has(document.id)) {
+      hasAutoZoomedRef.current.set(document.id, false);
     }
-    
-    // Only zoom if dimensions are available and we haven't zoomed yet
+  }, [document.id]);
+
+  // Direct auto-zoom to bottom-right quadrant when enabled and conditions are met
+  useEffect(() => {
     if (autoZoomToBottomRight && 
         pdfDimensions.width > 0 && 
         pdfDimensions.height > 0 && 
-        !hasZoomedRef.current) {
+        !hasAutoZoomedRef.current.get(document.id)) {
+      
+      console.log('Triggering direct auto-zoom to bottom-right quadrant');
       
       // Calculate the bottom-right quadrant
       const bottomRightQuadrant = {
@@ -96,11 +102,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         height: pdfDimensions.height / 2
       };
       
-      // Apply zoom with a delay to ensure the PDF has rendered
+      console.log('Bottom-right quadrant:', bottomRightQuadrant);
+      
+      // Apply zoom with proper timing
       const timeoutId = setTimeout(() => {
         zoomToRegion(bottomRightQuadrant);
-        hasZoomedRef.current = true;
-      }, 500);
+        hasAutoZoomedRef.current.set(document.id, true);
+      }, 600); // Slightly longer delay for stability
       
       return () => clearTimeout(timeoutId);
     }

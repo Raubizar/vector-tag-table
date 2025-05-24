@@ -44,6 +44,7 @@ export const usePdfRendering = ({
   } | null>(null);
   const [pageHash, setPageHash] = useState<string>('');
   const renderTimeoutRef = useRef<number | null>(null);
+  const isRenderingRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Clear any pending render timeout on cleanup or dependency change
@@ -57,7 +58,7 @@ export const usePdfRendering = ({
 
   useEffect(() => {
     const renderPdf = async () => {
-      if (!containerRef.current || !document.data) return;
+      if (!containerRef.current || !document.data || isRenderingRef.current) return;
       
       // Skip if we've already attempted this exact render
       const currentRender = {
@@ -69,33 +70,43 @@ export const usePdfRendering = ({
       if (lastRenderAttemptRef.current && 
           lastRenderAttemptRef.current.documentId === currentRender.documentId &&
           lastRenderAttemptRef.current.page === currentRender.page &&
-          Math.abs(lastRenderAttemptRef.current.scale - currentRender.scale) < 0.001) {
+          Math.abs(lastRenderAttemptRef.current.scale - currentRender.scale) < 0.01) {
         return;
       }
+      
+      // Set rendering flag to prevent overlapping renders
+      isRenderingRef.current = true;
+      
+      console.log('Starting PDF render:', currentRender);
       
       // Record this render attempt
       lastRenderAttemptRef.current = currentRender;
       
       try {
-        // Clear container before rendering to prevent flicker from old content
-        while (containerRef.current.firstChild) {
-          containerRef.current.removeChild(containerRef.current.firstChild);
+        // Only clear container if document or page changes, not for scale changes
+        const shouldClearContainer = !lastRenderAttemptRef.current || 
+          lastRenderAttemptRef.current.documentId !== currentRender.documentId ||
+          lastRenderAttemptRef.current.page !== currentRender.page;
+          
+        if (shouldClearContainer) {
+          console.log('Clearing container for new document/page');
+          while (containerRef.current.firstChild) {
+            containerRef.current.removeChild(containerRef.current.firstChild);
+          }
+          canvasRef.current = null;
+          textLayerRef.current = null;
         }
-        
-        canvasRef.current = null;
-        textLayerRef.current = null;
         
         // Create a safe copy of the ArrayBuffer to prevent detachment
         let pdfData: ArrayBuffer;
         
         try {
-          // Check if buffer is already detached and warn about it
           if (isArrayBufferDetached(document.data)) {
             console.warn("Document data was already detached, this might cause issues");
             toast.error("Document buffer was detached. Try reloading the document.");
+            return;
           }
           
-          // Always create a fresh copy for each render operation
           pdfData = cloneArrayBuffer(document.data);
         } catch (err) {
           console.error("Failed to clone buffer, it might be detached:", err);
@@ -106,6 +117,8 @@ export const usePdfRendering = ({
         // Generate page hash for template identification
         const currentPageHash = `page_${currentPage}_${scale.toFixed(2)}`;
         setPageHash(currentPageHash);
+        
+        console.log('Rendering PDF with hash:', currentPageHash);
         
         // Render the PDF with text layer enabled for selection
         const renderResult = await renderPdfPage(
@@ -138,17 +151,28 @@ export const usePdfRendering = ({
           height: renderResult.height
         });
         
-        // Handle auto-zoom if enabled
-        if (autoZoom && scale === 1 && renderResult.width > 1000) {
+        console.log('PDF rendered successfully:', {
+          width: renderResult.width,
+          height: renderResult.height,
+          scale,
+          autoZoom
+        });
+        
+        // Trigger auto-zoom for new documents (removed scale === 1 condition)
+        if (autoZoom && shouldClearContainer && renderResult.width > 800) {
+          console.log('Triggering auto-zoom to bottom-right quadrant');
           handleAutoZoom(renderResult);
         }
       } catch (error) {
         console.error('Error rendering PDF:', error);
         toast.error('Failed to render PDF. The file might be corrupted or too large.');
+      } finally {
+        // Always clear the rendering flag
+        isRenderingRef.current = false;
       }
     };
 
-    // Add a delay to prevent too many rapid renders causing flickering
+    // Increase debounce timeout to reduce flickering
     if (renderTimeoutRef.current !== null) {
       clearTimeout(renderTimeoutRef.current);
     }
@@ -156,28 +180,31 @@ export const usePdfRendering = ({
     renderTimeoutRef.current = window.setTimeout(() => {
       renderPdf();
       renderTimeoutRef.current = null;
-    }, 150); // Debounce renders
+    }, 200); // Increased from 150ms to 200ms
     
   }, [document, currentPage, scale, onDimensionsChange, autoZoom, enableTextLayer, enableTextCapture]);
 
   // Helper function to handle auto-zoom
   const handleAutoZoom = (renderResult: {width: number, height: number}) => {
-    // Wait a bit for the canvas to fully render
+    console.log('Setting up auto-zoom timeout');
+    // Wait for the canvas to fully render
     setTimeout(() => {
       // Calculate the bottom right quarter of the document
       const bottomRightQuadrant = {
-        x: renderResult.width / 2, // Start at middle of width
-        y: renderResult.height / 2, // Start at middle of height
-        width: renderResult.width / 2, // Half width
-        height: renderResult.height / 2 // Half height
+        x: renderResult.width / 2,
+        y: renderResult.height / 2,
+        width: renderResult.width / 2,
+        height: renderResult.height / 2
       };
+      
+      console.log('Dispatching auto-zoom event:', bottomRightQuadrant);
       
       // Dispatch a custom event to trigger zooming to this region
       const zoomEvent = new CustomEvent('auto-zoom-to-region', { 
         detail: bottomRightQuadrant
       });
       window.document.dispatchEvent(zoomEvent);
-    }, 300);
+    }, 500); // Increased timeout for better stability
   };
 
   return {
