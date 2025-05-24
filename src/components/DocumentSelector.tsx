@@ -23,7 +23,7 @@ const DocumentSelector: React.FC<DocumentSelectorProps> = ({
         <h3 className="text-sm font-medium">Documents</h3>
       </div>
       
-      <ScrollArea className="w-full" orientation="horizontal">
+      <ScrollArea className="w-full">
         <div className="flex space-x-2 pb-1">
           {documents.length > 0 ? (
             documents.map((doc) => (
