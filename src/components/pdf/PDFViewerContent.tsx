@@ -4,7 +4,7 @@ import { PDFDocument, Tag } from '@/lib/types';
 import PDFCanvas from './PDFCanvas';
 import TagOverlay from './TagOverlay';
 import PDFTextDebug from './PDFTextDebug';
-import { InteractionMode } from '@/hooks/usePdfInteraction';
+import { InteractionMode } from '@/hooks/pdf/constants';
 import usePdfTextDebug from '@/hooks/usePdfTextDebug';
 
 interface PDFViewerContentProps {

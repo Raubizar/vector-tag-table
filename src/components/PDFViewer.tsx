@@ -2,7 +2,7 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { PDFDocument, Tag } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
-import usePdfInteraction from '@/hooks/usePdfInteraction';
+import usePdfInteraction from '@/hooks/pdf/usePdfInteraction';
 import usePdfZoom from '@/hooks/usePdfZoom';
 import PDFViewerHeader from './pdf/PDFViewerHeader';
 import PDFViewerContent from './pdf/PDFViewerContent';

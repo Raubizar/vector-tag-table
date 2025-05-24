@@ -1,40 +1,61 @@
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Tag } from '@/lib/types';
-import usePdfTagSelection from './usePdfTagSelection';
-import usePdfSelectionState from './usePdfSelectionState';
-import { resizeTag } from './usePdfTagResize';
+import { Position } from '../usePdfSelectionState';
 import { findTagAtPosition, findResizeHandle } from '@/utils/pdfTagUtils';
+import { InteractionMode } from './constants';
+import { resizeTag } from '../usePdfTagResize';
 
-interface UsePdfInteractionProps {
+interface UsePdfMouseHandlersProps {
+  mode: InteractionMode;
   pdfDimensions: { width: number; height: number };
   existingTags: Tag[];
+  isSelecting: boolean;
+  startPos: Position;
+  currentPos: Position;
+  selectedTagId: string | null;
+  moveOffset: Position;
+  resizeHandle: string | null;
+  selectionPurpose: 'tag' | 'zoom' | null;
+  setIsSelecting: (isSelecting: boolean) => void;
+  setStartPos: (pos: Position) => void;
+  setCurrentPos: (pos: Position) => void;
+  setSelectedTagId: (id: string | null) => void;
+  setSelectionPurpose: (purpose: 'tag' | 'zoom' | null) => void;
+  setMoveOffset: (offset: Position) => void;
+  setResizeHandle: (handle: string | null) => void;
   onRegionSelected: (region: Tag['region']) => void;
   onTagUpdated?: (tagId: string, newRegion: Tag['region']) => void;
   onZoomToRegion?: (region: { x: number, y: number, width: number, height: number }) => void;
+  resetSelection: () => void;
+  resetTagSelection: () => void;
 }
 
-export type InteractionMode = 'select' | 'move' | 'resize' | 'zoom';
-
-export default function usePdfInteraction({
+export function usePdfMouseHandlers({
+  mode,
   pdfDimensions,
   existingTags,
+  isSelecting,
+  startPos,
+  currentPos,
+  selectedTagId,
+  moveOffset,
+  resizeHandle,
+  selectionPurpose,
+  setIsSelecting,
+  setStartPos,
+  setCurrentPos,
+  setSelectedTagId,
+  setSelectionPurpose,
+  setMoveOffset,
+  setResizeHandle,
   onRegionSelected,
   onTagUpdated,
-  onZoomToRegion
-}: UsePdfInteractionProps) {
-  const [mode, setMode] = useState<InteractionMode>('select');
+  onZoomToRegion,
+  resetSelection,
+  resetTagSelection
+}: UsePdfMouseHandlersProps) {
   
-  const [
-    { isSelecting, startPos, currentPos, selectionPurpose },
-    { setIsSelecting, setStartPos, setCurrentPos, setSelectionPurpose, resetSelection }
-  ] = usePdfSelectionState();
-  
-  const [
-    { selectedTagId, resizeHandle, moveOffset },
-    { setSelectedTagId, setResizeHandle, setMoveOffset, resetTagSelection }
-  ] = usePdfTagSelection();
-
   const handleMouseDown = useCallback((e: React.MouseEvent, containerRect: DOMRect) => {
     const x = e.clientX - containerRect.left;
     const y = e.clientY - containerRect.top;
@@ -201,14 +222,6 @@ export default function usePdfInteraction({
   ]);
 
   return {
-    mode,
-    setMode,
-    isSelecting,
-    startPos,
-    currentPos,
-    selectedTagId,
-    resizeHandle,
-    selectionPurpose,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp
